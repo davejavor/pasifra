@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#14110d">
 <title>Pražská šifrovací hra</title>
+<script>
+// WebCrypto funguje jen přes https; na ostré doméně přesměrujeme (localhost nechán být).
+if (location.protocol === 'http:' && /(^|\.)jadelab\.cz$/.test(location.hostname)) {
+  location.replace('https:' + location.href.slice(location.protocol.length));
+}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&display=swap&subset=latin-ext" rel="stylesheet">

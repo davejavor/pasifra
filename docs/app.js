@@ -75,6 +75,7 @@ window.resetAndReload = resetAndReload;
 
 async function init() {
   if (!token) return intro();
+  if (!globalThis.crypto?.subtle) return needHttps();
   try {
     id = await fileId(token);
     if (params.get('reset')) return resetAndReload();
@@ -106,6 +107,14 @@ async function init() {
   document.querySelectorAll('nav button').forEach((b) => b.addEventListener('click', () => { view = b.dataset.view; render(); }));
   await render();
   setInterval(tick, 1000);
+}
+
+function needHttps() {
+  const url = 'https://' + location.host + location.pathname + location.search;
+  main.innerHTML = `<div class="card"><h2>Otevřete odkaz přes https://</h2>
+    <p>Hra potřebuje zabezpečené spojení a v tomto okně se nespustí.</p>
+    <p class="dim" style="word-break:break-all">${esc(url)}</p>
+    <a class="btn" href="${esc(url)}">Otevřít zabezpečenou verzi</a></div>`;
 }
 
 function broken() {
