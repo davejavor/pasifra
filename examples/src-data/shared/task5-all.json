@@ -1,0 +1,11 @@
+{
+  "title": "Finále pro všechny",
+  "body_md": "Všechny týmy hledají poslední nápis. Kód je rok z pamětní desky.",
+  "image": null,
+  "hints": [
+    { "after_min": 15, "text": "Malá nápověda: deska je na rohu ulice Na Příkopě." },
+    { "after_min": 30, "text": "Velká nápověda: rok je z 19. století." }
+  ],
+  "answer": "Zlatá Praha 1848",
+  "item": { "label": "Indicie 3", "text": "Poslední dílek mapy: kříž označuje cíl." }
+}

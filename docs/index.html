@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14110d">
+<title>Pražská šifrovací hra</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&display=swap&subset=latin-ext" rel="stylesheet">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header id="top"><span id="team"></span><span id="testbadge" hidden>TESTOVACÍ ČAS</span></header>
+<div id="banners"></div>
+<main id="main"><p class="center">Načítám…</p></main>
+<nav id="nav" hidden>
+  <button data-view="task">Úkol</button>
+  <button data-view="solved">Vyřešené</button>
+  <button data-view="items">Předměty</button>
+  <button data-view="contact">Kontakt</button>
+</nav>
+<div id="flash" hidden><div>✓ Správně!</div></div>
+<script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+{
+  "team": "zizka",
+  "name": "Žižkovi husité",
+  "token": "cNN8XMnyoVotOaMVBT-tpCHR",
+  "salt": "cCihJTU0kjK6U6qxtz7WW6pn",
+  "tasks": [
+    {
+      "title": "Kámen na Staroměstském náměstí",
+      "body_md": "Hledejte sochu muže s knihou a plamenem. Kolik let uplynulo od jeho upálení do roku 2026? Odpovědí je jméno z nápisu pod ním.",
+      "image": null,
+      "hints": [
+        {
+          "after_min": 15,
+          "text": "Malá nápověda: hledejte u pomníku uprostřed náměstí."
+        },
+        {
+          "after_min": 25,
+          "text": "Velká nápověda: jméno na podstavci je Jan Hus."
+        }
+      ],
+      "answer": "Jan Hus",
+      "item": {
+        "label": "Indicie 1",
+        "text": "Pergamen s vodoznakem ve tvaru kalicha."
+      }
+    },
+    {
+      "title": "Druhá zastávka",
+      "body_md": "Zadání úkolu 2 týmu zizka. Kód přečtěte na místě.",
+      "image": null,
+      "hints": [
+        {
+          "after_min": 10,
+          "text": "Malá nápověda k úkolu 2."
+        },
+        {
+          "after_min": 20,
+          "text": "Velká nápověda k úkolu 2."
+        }
+      ],
+      "answer": "Týnský chrám",
+      "item": {
+        "label": "Indicie 2",
+        "text": "Předmět z úkolu 2 (zizka)."
+      }
+    },
+    {
+      "title": "Sólo úkol",
+      "body_md": "Zadání úkolu 3 týmu zizka. Kód přečtěte na místě.",
+      "image": null,
+      "hints": [
+        {
+          "after_min": 10,
+          "text": "Malá nápověda k úkolu 3."
+        },
+        {
+          "after_min": 20,
+          "text": "Velká nápověda k úkolu 3."
+        }
+      ],
+      "answer": "Pražský Jezulátko",
+      "item": {
+        "label": "Indicie 3",
+        "text": "Předmět z úkolu 3 (zizka)."
+      }
+    },
+    {
+      "ref": "shared/task4-pair"
+    },
+    {
+      "ref": "shared/task5-all"
+    }
+  ],
+  "finale": {
+    "ref": "shared/finale"
+  }
+}

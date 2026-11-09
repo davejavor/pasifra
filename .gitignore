@@ -1,0 +1,4 @@
+# Plaintext zdroje úkolů – vlastní (soukromý) git repozitář vnořený sem
+/src-data/
+/cheatsheet.html
+node_modules/

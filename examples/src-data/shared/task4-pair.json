@@ -1,0 +1,11 @@
+{
+  "title": "Společný úkol dvojice",
+  "body_md": "Sejděte se s druhým týmem u kašny. Kód je slovo z mosazné tabulky.",
+  "image": null,
+  "hints": [
+    { "after_min": 10, "text": "Malá nápověda: tabulka je nízko u země." },
+    { "after_min": 20, "text": "Velká nápověda: slovo začíná na K." }
+  ],
+  "answer": "Karel IV.",
+  "item": { "label": "Indicie 2", "text": "Zlatý klíč se zubem ve tvaru lilie." }
+}

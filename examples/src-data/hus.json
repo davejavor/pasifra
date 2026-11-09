@@ -1,0 +1,77 @@
+{
+  "team": "hus",
+  "name": "Betlémští poutníci",
+  "token": "UyJrE1RTagM-iU2fbjM-h0uO",
+  "salt": "D7nHUaXB2I-93SNWKS0JU9S9",
+  "tasks": [
+    {
+      "title": "Zvon u Karlova mostu",
+      "body_md": "Na věži u mostu visí zvon. Přečtěte letopočet vyrytý na jeho plášti.",
+      "image": null,
+      "hints": [
+        {
+          "after_min": 10,
+          "text": "Malá nápověda: věž je na staroměstské straně mostu."
+        },
+        {
+          "after_min": 20,
+          "text": "Velká nápověda: letopočet má čtyři číslice a začíná jedničkou."
+        }
+      ],
+      "answer": "1357",
+      "item": {
+        "label": "Indicie 1",
+        "text": "Otisk pečeti s korunou."
+      }
+    },
+    {
+      "title": "Druhá zastávka",
+      "body_md": "Zadání úkolu 2 týmu hus. Kód přečtěte na místě.",
+      "image": null,
+      "hints": [
+        {
+          "after_min": 10,
+          "text": "Malá nápověda k úkolu 2."
+        },
+        {
+          "after_min": 20,
+          "text": "Velká nápověda k úkolu 2."
+        }
+      ],
+      "answer": "Orloj 1410",
+      "item": {
+        "label": "Indicie 2",
+        "text": "Předmět z úkolu 2 (hus)."
+      }
+    },
+    {
+      "title": "Sólo úkol",
+      "body_md": "Zadání úkolu 3 týmu hus. Kód přečtěte na místě.",
+      "image": null,
+      "hints": [
+        {
+          "after_min": 10,
+          "text": "Malá nápověda k úkolu 3."
+        },
+        {
+          "after_min": 20,
+          "text": "Velká nápověda k úkolu 3."
+        }
+      ],
+      "answer": "Vltava",
+      "item": {
+        "label": "Indicie 3",
+        "text": "Předmět z úkolu 3 (hus)."
+      }
+    },
+    {
+      "ref": "shared/task4-pair"
+    },
+    {
+      "ref": "shared/task5-all"
+    }
+  ],
+  "finale": {
+    "ref": "shared/finale"
+  }
+}
