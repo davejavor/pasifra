@@ -4,6 +4,8 @@
 //   node build.mjs --verify        dešifruje celý řetěz z vygenerovaných souborů pomocí odpovědí ze zdroje
 //   node build.mjs --new-token     vypíše náhodný token (144 bitů) – použij i jako sůl
 //   node build.mjs --cheatsheet    vytvoří cheatsheet.html (lokální, v .gitignore)
+//   node build.mjs --wordsearch <soubor> [--task=N] [--size=N] [--seed=N]
+//                                  vyrobí mřížku osmisměrky a zapíše grid + underlay.cells zpět do souboru
 // Volby: --src=<složka> (výchozí src-data)  --out=<složka> (výchozí docs/data)  --base=<url> (pro cheatsheet)
 
 import { promises as fs } from 'node:fs';
@@ -14,6 +16,7 @@ import {
   DEFAULT_ITER, normalize, deriveKey, deriveNext, secretFromToken,
   encrypt, decrypt, fileId,
 } from './lib/crypto.mjs';
+import { analyze, generate, preview, wsNorm } from './lib/wordsearch.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
@@ -56,8 +59,22 @@ async function resolveRef(obj) {
   return { ...(await readJson(file)), shared: obj.ref };
 }
 
+// Zásobník všech pojmů osmisměrek (kontrola, že se v mřížce neobjeví cizí slovo). Volitelný.
+let POOL = [];
+async function loadPool(warnings) {
+  const file = path.join(SRC, 'shared', 'wordsearch-pool.json');
+  try {
+    const j = JSON.parse(await fs.readFile(file, 'utf8'));
+    POOL = Array.isArray(j) ? j : j.words || [];
+  } catch (e) {
+    POOL = [];
+    if (e.code === 'ENOENT') warnings.push('chybí shared/wordsearch-pool.json – cizí slova v osmisměrkách se nehlídají');
+    else throw new Error(`${path.relative(ROOT, file)}: ${e.message}`);
+  }
+}
+
 // Vrátí { tasks, finale } s doplněnými obrázky a příznakem shared.
-async function loadTeam(file, errors) {
+async function loadTeam(file, errors, warnings) {
   const raw = await readJson(file);
   const name = path.basename(file);
   const err = (m) => errors.push(`${name}: ${m}`);
@@ -74,6 +91,23 @@ async function loadTeam(file, errors) {
     const t = await resolveRef(t0);
     const where = `úkol ${i + 1}`;
     if (t.id !== undefined && t.id !== i + 1) err(`${where}: id=${t.id} neodpovídá pořadí`);
+    let wsContent = null;
+    if (t.wordsearch) {
+      const a = analyze(t.wordsearch, POOL);
+      a.errors.forEach((m) => err(`${where}: osmisměrka: ${m}`));
+      if (!a.errors.length) {
+        wsContent = {
+          size: a.n,
+          grid: a.rows.map((r) => r.join('')),
+          words: a.placements.map(({ r, c, dr, dc, len }) => ({ r, c, dr, dc, len })),
+          underlay: t.wordsearch.underlay.cells,
+        };
+        const hay = wsNorm(t.item?.text);
+        if (!hay.includes(wsNorm(t.wordsearch.underlay.text))) warnings.push(`${name}: ${where}: item.text neobsahuje slabiku podkresu „${t.wordsearch.underlay.text}“`);
+      }
+      if (t.answer && normalize(t.answer) !== normalize(t.wordsearch.solution || '')) err(`${where}: "answer" neodpovídá tajence osmisměrky`);
+      t.answer = t.answer || t.wordsearch.solution;
+    }
     for (const k of ['title', 'body_md', 'answer']) if (!t[k] || typeof t[k] !== 'string') err(`${where}: chybí "${k}"`);
     if (t.answer && normalize(t.answer).length < 1) err(`${where}: odpověď je po normalizaci prázdná`);
     if (!t.item || !t.item.label || !t.item.text) err(`${where}: chybí "item" (label + text)`);
@@ -88,6 +122,7 @@ async function loadTeam(file, errors) {
         id: i + 1,
         shared: t.shared,
         answer: t.answer || '',
+        ws: wsContent ? { spec: t.wordsearch, analysis: analyze(t.wordsearch, POOL) } : null,
         content: {
           id: i + 1,
           title: t.title,
@@ -95,6 +130,7 @@ async function loadTeam(file, errors) {
           image: await imageToDataUrl(t.image),
           hints: hints.map((h) => ({ after_min: h.after_min, text: h.text })),
           item: t.item ? { label: t.item.label, text: t.item.text, image: await imageToDataUrl(t.item.image) } : null,
+          ...(wsContent ? { wordsearch: wsContent } : {}),
         },
       });
     } catch (e) {
@@ -129,11 +165,12 @@ async function loadAll() {
     if (!c.name || !/^\d{9,15}$/.test(c.phone || '')) errors.push(`common.json: kontakt ${JSON.stringify(c)} – telefon jen číslice včetně předvolby, např. 420777123456`);
   }
 
+  try { await loadPool(warnings); } catch (e) { errors.push(e.message); }
   const files = (await fs.readdir(SRC)).filter((f) => f.endsWith('.json') && f !== 'common.json').sort();
   const teams = [];
   for (const f of files) {
     try {
-      teams.push(await loadTeam(path.join(SRC, f), errors));
+      teams.push(await loadTeam(path.join(SRC, f), errors, warnings));
     } catch (e) {
       errors.push(e.message);
     }
@@ -257,6 +294,13 @@ async function verify() {
     const fin = await decrypt(key, data.finale);
     if (!fin || !same(fin, t.finale)) e('finále se nedešifruje odpovědí na poslední úkol');
     if (!errors.some((m) => m.startsWith(t.team + ':'))) console.log(`OK  ${t.team} (${t.tasks.length} úkolů + finále)`);
+    for (const k of t.tasks) {
+      if (!k.ws) continue;
+      const a = k.ws.analysis;
+      console.log(`    osmisměrka (úkol ${k.id}, ${a.n}×${a.n}): ${a.placements.length} slov, tajenka „${a.leftover}“, podkres „${a.underlay}“`);
+      console.log(preview(a, k.ws.spec.underlay?.cells).replace(/^/gm, '      '));
+      a.infos.forEach((m) => console.log('    info:', m));
+    }
   }
 
   try {
@@ -287,6 +331,7 @@ async function cheatsheet() {
     <p><b>Kód:</b> ${esc(k.answer)} <code>${esc(normalize(k.answer))}</code></p>
     <p><b>Zadání:</b> ${nl(k.content.body_md)}</p>
     <ul>${k.content.hints.map((h) => `<li>po ${h.after_min} min: ${nl(h.text)}</li>`).join('')}</ul>
+    ${k.ws ? `<p><b>Osmisměrka:</b> tajenka <code>${esc(k.ws.analysis.leftover)}</code>, podkres <code>${esc(k.ws.analysis.underlay)}</code>, slova: ${esc(k.ws.spec.words.join(', '))}</p>` : ''}
     <p><b>Nalezený předmět:</b> ${esc(k.content.item?.label)} – ${nl(k.content.item?.text)}</p>
   </article>`).join('')}
   <article><h3>Finále: ${esc(t.finale.title)}</h3><p>${nl(t.finale.body_md)}</p></article>
@@ -300,6 +345,42 @@ async function cheatsheet() {
   console.log('Vytvořeno', path.relative(ROOT, out));
 }
 
+// ---------- generátor osmisměrky ----------
+
+async function wordsearchCli() {
+  const file = args[args.indexOf('--wordsearch') + 1];
+  if (!file || file.startsWith('--')) fail(['použití: node build.mjs --wordsearch <soubor> [--task=N] [--size=N] [--seed=N]']);
+  const abs = path.resolve(file);
+  const json = await readJson(abs);
+  let target;
+  if (Array.isArray(json.words)) target = json;
+  else if (json.wordsearch) target = json.wordsearch;
+  else if (Array.isArray(json.tasks)) {
+    const t = json.tasks[Number(opt('task', 0)) - 1];
+    if (!t) fail(['u týmového souboru zadejte --task=N (číslo úkolu s osmisměrkou)']);
+    if (t.ref) fail([`úkol ${opt('task')} je odkaz (${t.ref}); spusťte generátor na souboru sdíleného úkolu`]);
+    target = t.wordsearch;
+  }
+  if (!target) fail(['v souboru jsem nenašel osmisměrku (objekt s "words", úkol s "wordsearch" nebo týmový soubor s --task=N)']);
+
+  const pool = [];
+  await loadPool([]);
+  pool.push(...POOL);
+  const size = opt('size') ? Number(opt('size')) : target.size;
+  const r = generate(target, { pool, size, seed: Number(opt('seed', target.seed ?? 1)) });
+  if (!r.ok) { console.error(r.report.join('\n')); process.exit(1); }
+
+  target.size = r.size;
+  target.grid = r.grid;
+  target.underlay = { ...target.underlay, cells: r.cells };
+  const text = JSON.stringify(json, null, 2).replace(/\[\s*(\d+),\s*(\d+)\s*\]/g, '[$1,$2]');
+  await fs.writeFile(abs, text + '\n');
+  console.log(`Hotovo: ${r.size}×${r.size}, ${r.attempts}. pokus. Zapsáno do ${path.relative(process.cwd(), abs)}.`);
+  console.log(`Tajenka: ${r.analysis.leftover}\nPodkres: ${r.analysis.underlay} (v hranatých závorkách), tajenka malými písmeny\n`);
+  console.log(preview(r.analysis, r.cells));
+  r.analysis.infos.forEach((m) => console.log('info:', m));
+}
+
 function fail(errors) {
   console.error(`\nCHYBY (${errors.length}):`);
   errors.forEach((m) => console.error(' ✗', m));
@@ -307,6 +388,7 @@ function fail(errors) {
 }
 
 if (flag('new-token')) console.log(randomBytes(18).toString('base64url'));
+else if (flag('wordsearch')) await wordsearchCli();
 else if (flag('verify')) await verify();
 else if (flag('cheatsheet')) await cheatsheet();
 else await build();

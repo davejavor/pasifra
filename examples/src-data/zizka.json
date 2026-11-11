@@ -45,23 +45,65 @@
       }
     },
     {
-      "title": "Sólo úkol",
-      "body_md": "Zadání úkolu 3 týmu zizka. Kód přečtěte na místě.",
+      "title": "Šermířská osmisměrka",
+      "body_md": "V mřížce se ukrývají šermířské pojmy. Seznam slov vám nikdo neukáže.\n\nTáhněte dvěma ťuknutími: první na začátek slova, druhé na jeho konec. Zbylá písmena čtěte po řádcích a dají vám místo, kam jít dál.",
       "image": null,
       "hints": [
         {
           "after_min": 10,
-          "text": "Malá nápověda k úkolu 3."
+          "text": "Malá nápověda: slova začínají písmeny O, O, V, A, O, I, T, Z, Z, H, P, N, A, P, V, Č."
         },
         {
           "after_min": 20,
-          "text": "Velká nápověda k úkolu 3."
+          "text": "Velká nápověda: hledáte OBERHAW, ODKROK, VORSCHLAG, ANSETZEN, OCHS, INDES, TEMPO, ZÁLUD, ZÁPAS, HROT, PROTIÚTOK, NACHREISEN, ABSETZEN, PARÁDA, VÝPAD, ČEPEL."
         }
       ],
-      "answer": "Pražský Jezulátko",
+      "wordsearch": {
+        "size": 10,
+        "seed": 1,
+        "words": [
+          "OBERHAW",
+          "ODKROK",
+          "VORSCHLAG",
+          "ANSETZEN",
+          "OCHS",
+          "INDES",
+          "TEMPO",
+          "ZÁLUD",
+          "ZÁPAS",
+          "HROT",
+          "PROTIÚTOK",
+          "NACHREISEN",
+          "ABSETZEN",
+          "PARÁDA",
+          "VÝPAD",
+          "ČEPEL"
+        ],
+        "solution": "BETLÉMSKÁ KAPLE",
+        "underlay": {
+          "text": "RIC",
+          "cells": [
+            [4,2],
+            [5,4],
+            [8,4]
+          ]
+        },
+        "grid": [
+          "DNEZTESNAB",
+          "UOTELEPEČD",
+          "LDNEZTESBA",
+          "ÁKTHMLÉIZP",
+          "ZRRMSPKEÁÝ",
+          "KOTÚITORPV",
+          "TKÁOBERHAW",
+          "PARÁDAKCSA",
+          "VORSCHLAGP",
+          "LOCHSEDNIE"
+        ]
+      },
       "item": {
-        "label": "Indicie 3",
-        "text": "Předmět z úkolu 3 (zizka)."
+        "label": "Indicie 3 – slabika",
+        "text": "Slabika z podkresu: RIC"
       }
     },
     {

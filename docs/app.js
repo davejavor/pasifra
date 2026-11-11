@@ -1,4 +1,5 @@
 import { CONFIG } from './config.js';
+import { mountWordSearch } from './wordsearch.js';
 import { fileId, secretFromToken, deriveKey, deriveNext, exportKey, importKey, decrypt, normalize } from './crypto.js';
 
 const params = new URLSearchParams(location.search);
@@ -35,7 +36,7 @@ const store = {
 const utf8 = (b64) => { try { return new TextDecoder().decode(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))); } catch { return ''; } };
 
 // ---------- stav ----------
-let id, data, meta, K, S, view = 'task';
+let id, data, meta, K, S, view = 'task', taskCtx = null;
 const cache = new Map();
 
 // S = { keys: {meta, tasks:[b64], finale:b64|null}, at:[ms odemčení] }
@@ -69,6 +70,9 @@ async function loadData() {
 function resetAndReload() {
   store.del('pasifra:data:' + id);
   store.del('pasifra:state:' + id);
+  try {
+    for (const k of Object.keys(localStorage)) if (k.startsWith(`pasifra:ws:${id}:`)) localStorage.removeItem(k);
+  } catch { /* nevadí */ }
   location.href = location.pathname + '?t=' + encodeURIComponent(token) + (params.get('now') ? '&now=' + encodeURIComponent(params.get('now')) : '');
 }
 window.resetAndReload = resetAndReload;
@@ -152,6 +156,7 @@ async function renderTask() {
   if (!c) return broken();
   main.innerHTML = `
     <div class="card"><h2>${i + 1}. ${esc(c.title)}</h2>${img(c.image)}${md(c.body_md)}</div>
+    ${c.wordsearch ? '<div class="card" id="wsmount"></div>' : ''}
     <form id="f" autocomplete="off">
       <label for="code" class="dim">Kód z místa</label>
       <input id="code" type="text" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="go">
@@ -162,6 +167,21 @@ async function renderTask() {
     <button class="stuck" id="stuck">Zasekli jsme se</button>`;
   $('stuck').onclick = () => { view = 'contact'; render(); };
   $('f').onsubmit = onSubmit;
+  if (c.wordsearch) {
+    const key = `pasifra:ws:${id}:${i}`;
+    mountWordSearch($('wsmount'), c.wordsearch, {
+      load() { try { return JSON.parse(store.get(key)) || []; } catch { return []; } },
+      save(list) { store.set(key, JSON.stringify(list)); },
+    });
+  }
+  taskCtx = { c, i };
+  renderHints();
+}
+
+// Samostatně, aby odemknutí nápovědy nesmazalo rozepsaný kód ani výběr v osmisměrce.
+function renderHints() {
+  if (!taskCtx || !$('hints')) return;
+  const { c, i } = taskCtx;
   const names = ['Malá nápověda', 'Velká nápověda'];
   $('hints').innerHTML = c.hints.map((h, j) => {
     const when = S.at[i] + h.after_min * 60000;
@@ -238,7 +258,7 @@ function tick() {
     el.querySelector('.timer').textContent = mmss(left);
     if (next == null) next = left;
   });
-  if (expired && view === 'task') return render();
+  if (expired && view === 'task' && taskCtx) { renderHints(); return tick(); }
   const nh = $('nexthint');
   if (nh) nh.innerHTML = next == null ? 'Všechny nápovědy jsou odemčené.' : `Další nápověda za <span class="timer">${mmss(next)}</span>`;
   $('banners').innerHTML = CONFIG.MESSAGES.filter((m) => t >= Date.parse(m.at)).reverse()

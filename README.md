@@ -16,6 +16,7 @@ Repo je **veřejné**, proto je všechno tajné jen zašifrované (AES-GCM, klí
 
 ```
 build.mjs            šifrování, --verify, --cheatsheet, --new-token
+lib/wordsearch.mjs   analýza a generátor osmisměrky (build, verify)
 lib/crypto.mjs       sdílený kód (build i prohlížeč, kopíruje se do docs/crypto.js)
 lib/sw.template.js   šablona service workeru (build vyrobí docs/sw.js s verzí cache)
 docs/                to, co jde na GitHub Pages
@@ -70,12 +71,41 @@ Pak jde zálohovat a verzovat zvlášť a do veřejného repa se nikdy nedostane
 - `finale` je závěrečná obrazovka (`title`, `body_md`, volitelně `image`), odemkne se kódem posledního úkolu.
 - Každý úkol má přesně 2 nápovědy s `after_min` vzestupně.
 
+### Osmisměrka jako úkol
+
+Úkol může mít navíc objekt `wordsearch`. Mřížku nepíšete ručně, vyrobí ji generátor:
+
+```json
+{
+  "title": "Šermířská osmisměrka",
+  "body_md": "…",
+  "hints": [ … ],
+  "wordsearch": {
+    "size": 10,
+    "words": ["OBERHAW", "VORSCHLAG", "OCHS", "…"],
+    "solution": "BETLÉMSKÁ KAPLE",
+    "underlay": { "text": "RIC" }
+  },
+  "item": { "label": "Indicie 3", "text": "Slabika z podkresu: RIC" }
+}
+```
+
+- `answer` se nemusí psát, kódem je `solution` (normalizuje se jako vždy). Na zbytek úkolu se nic nemění.
+- Písmena jsou velká, **diakritika se zachovává, CH jsou dvě políčka**. Velikost 8×8 až 12×12.
+- **Počet políček musí sedět:** `size² − délka tajenky = počet obsazených políček`. Slova mají dohromady méně písmen, než je potřeba, jen když se zmenší mřížka, zkrátí tajenka nebo přidají slova. Generátor to spočítá a napíše.
+- `node build.mjs --wordsearch <soubor>` doplní `size`, `grid` a `underlay.cells` ([řádek, sloupec] od 0) zpět do souboru. Soubor může být samotný objekt osmisměrky, úkol, nebo týmový soubor s `--task=N`. Sdílený úkol (`ref`) pusťte na jeho vlastním souboru v `shared/`. Volitelně `--size=`, `--seed=`.
+- Zásobník všech pojmů je `src-data/shared/wordsearch-pool.json` (`{"words": [...]}` nebo pole). Generátor i `--verify` hlídají, že se v mřížce neobjeví jiné slovo ze zásobníku (ani pozpátku). Slovo, které je jen částí slova z téže mřížky, se vypíše jako info.
+- `--verify` (a build) zkontrolují, že každé slovo je v mřížce právě jednou, zbylá písmena dávají přesně `solution` a podkres leží ve slovech v pořadí čtení. Vypíše tajenku, podkres a mřížku (tajenka malými písmeny, podkres v `[ ]`).
+- Slabika podkresu se týmu ztratí, pokud ji nezapíšete do `item.text`. Build na to upozorní varováním.
+- V klientu tým klepne na začátek a na konec slova (8 směrů, bez tažení), seznam slov se nezobrazuje. Postup se ukládá do `localStorage`. Po nalezení všech slov se zvýrazní zbylá písmena (tajenka) a podkres.
+
 ### Příkazy
 
 ```
 node build.mjs --new-token      náhodný token (použijte i jako sůl)
 node build.mjs                  zašifruje src-data/ do docs/data/ a obnoví docs/crypto.js a docs/sw.js
 node build.mjs --verify         dešifruje celý řetěz všech týmů pomocí odpovědí ze zdroje
+node build.mjs --wordsearch <soubor>  vyrobí mřížku osmisměrky (viz výše)
 node build.mjs --cheatsheet     vytvoří cheatsheet.html (v .gitignore) s odpověďmi, nápovědami a odkazy
                                 (--base=https://UZIVATEL.github.io/pasifra/ doplní adresu do odkazů)
 ```

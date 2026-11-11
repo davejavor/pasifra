@@ -31,3 +31,16 @@ nav button.on{color:var(--accent);box-shadow:inset 0 3px var(--accent)}
 .finale{text-align:center;border-color:var(--accent);animation:pop .9s ease-out}
 .finale h2{font-size:2.4rem}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}}
+
+/* osmisměrka */
+.ws-top{display:flex;align-items:center;justify-content:space-between;gap:.6rem}
+.ws-top .timer{font-size:1.3rem}
+.ws-top .ws-cancel{width:auto;margin:.3rem 0;padding:.5rem .9rem;min-height:2.8rem;font-size:1rem}
+.ws-box{container-type:inline-size}
+.ws{display:grid;grid-template-columns:repeat(var(--n),1fr);gap:3px;margin:.4rem 0}
+.ws button.c{margin:0;padding:0;min-height:0;aspect-ratio:1;width:100%;display:grid;place-items:center;border:1px solid var(--line);border-radius:.35rem;background:#0e0c09;color:var(--text);font:700 calc(55cqw / var(--n)) system-ui,sans-serif;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.ws button.c.found{background:#4a3d2b;border-color:var(--accent)}
+.ws button.c.start{background:var(--accent);color:#1a1409;border-color:#fff;outline:3px solid #fff;outline-offset:1px}
+.ws button.c.dim{opacity:.5}
+.ws button.c.rest{background:var(--accent);color:#1a1409;border-color:var(--accent)}
+.ws button.c.under{opacity:1;background:#2f4a63;border-color:#7fb2e0;color:var(--text)}
