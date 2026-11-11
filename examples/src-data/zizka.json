@@ -51,11 +51,11 @@
       "hints": [
         {
           "after_min": 10,
-          "text": "Malá nápověda: slova začínají písmeny V, P, Ř, Z, A, O, O, O, P, T."
+          "text": "Malá nápověda: slova začínají písmeny {{prvni_pismena}}."
         },
         {
           "after_min": 20,
-          "text": "Velká nápověda: hledáte VORSCHLAG, PROTIÚTOK, ŘAP, ZÁLUD, ALBER, ODVETA, OHROŽENÍ, OBERHAW, PŘÍPRAVA, TĚŽIŠTĚ."
+          "text": "Velká nápověda: hledáte {{pocet}} slov: {{slova}}."
         }
       ],
       "wordsearch": {
@@ -64,47 +64,24 @@
         "underlay": {
           "text": "RIC",
           "cells": [
-            [
-              0,
-              6
-            ],
-            [
-              3,
-              4
-            ],
-            [
-              4,
-              4
-            ]
+            [2,3],
+            [4,4],
+            [5,4]
           ]
         },
-        "require": [
-          "VORSCHLAG",
-          "PROTIÚTOK"
-        ],
+        "require": ["VORSCHLAG", "PROTIÚTOK"],
         "size": 9,
-        "words": [
-          "VORSCHLAG",
-          "PROTIÚTOK",
-          "ŘAP",
-          "ZÁLUD",
-          "ALBER",
-          "ODVETA",
-          "OHROŽENÍ",
-          "OBERHAW",
-          "PŘÍPRAVA",
-          "TĚŽIŠTĚ"
-        ],
+        "words": ["VORSCHLAG", "PROTIÚTOK", "ŘAP", "ZÁLUD", "ALBER", "ODVETA", "OHROŽENÍ", "OBERHAW", "PŘÍPRAVA", "TĚŽIŠTĚ"],
         "grid": [
-          "BEALBERTŘ",
-          "LĚTŠIŽĚTA",
-          "ÉMODVETAP",
-          "KOTÚITORP",
-          "GALHCSROV",
-          "SOBERHAWK",
-          "ÁKAPDULÁZ",
-          "AVARPÍŘPL",
-          "OHROŽENÍE"
+          "BEODVETAP",
+          "ÍNEŽORHOA",
+          "WAHREBOTŘ",
+          "LAVARPÍŘP",
+          "ÉTĚŽIŠTĚM",
+          "VORSCHLAG",
+          "SKÁKALBER",
+          "APZÁLUDLE",
+          "PROTIÚTOK"
         ]
       },
       "item": {

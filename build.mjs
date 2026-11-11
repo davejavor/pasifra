@@ -4,6 +4,8 @@
 //   node build.mjs --verify        dešifruje celý řetěz z vygenerovaných souborů pomocí odpovědí ze zdroje
 //   node build.mjs --new-token     vypíše náhodný token (144 bitů) – použij i jako sůl
 //   node build.mjs --cheatsheet    vytvoří cheatsheet.html (lokální, v .gitignore)
+//   node build.mjs --wordsearch-all [--seed=N] [--rounds=N] [--size=N]
+//                                  přegeneruje všechny osmisměrky najednou, slova rozdělí co nejvyváženěji
 //   node build.mjs --wordsearch <soubor> [--task=N] [--size=N] [--seed=N] [--reselect]
 //                                  vybere slova ze zásobníku (nejsou-li v souboru), vyrobí mřížku a zapíše words, grid a underlay.cells
 // Volby: --src=<složka> (výchozí src-data)  --out=<složka> (výchozí docs/data)  --base=<url> (pro cheatsheet)
@@ -16,7 +18,7 @@ import {
   DEFAULT_ITER, normalize, deriveKey, deriveNext, secretFromToken,
   encrypt, decrypt, fileId,
 } from './lib/crypto.mjs';
-import { analyze, generate, generateAuto, parsePool, checkRules, preview, wsNorm } from './lib/wordsearch.mjs';
+import { analyze, generate, generateAuto, parsePool, checkRules, expandHint, mulberry32, preview, wsNorm } from './lib/wordsearch.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
@@ -120,6 +122,7 @@ async function loadTeam(file, errors, warnings) {
     hints.forEach((h, j) => {
       if (typeof h.after_min !== 'number' || h.after_min < 0 || !h.text) err(`${where}: nápověda ${j + 1} je neplatná`);
       if (j > 0 && h.after_min <= hints[j - 1].after_min) err(`${where}: nápovědy musí jít časově vzestupně`);
+      expandHint(h.text, t.wordsearch).errors.forEach((m) => err(`${where}: nápověda ${j + 1}: ${m}`));
     });
     try {
       tasks.push({
@@ -132,7 +135,7 @@ async function loadTeam(file, errors, warnings) {
           title: t.title,
           body_md: t.body_md,
           image: await imageToDataUrl(t.image),
-          hints: hints.map((h) => ({ after_min: h.after_min, text: h.text })),
+          hints: hints.map((h) => ({ after_min: h.after_min, text: expandHint(h.text, t.wordsearch).text })),
           item: t.item ? { label: t.item.label, text: t.item.text, image: await imageToDataUrl(t.item.image) } : null,
           ...(wsContent ? { wordsearch: wsContent } : {}),
         },
@@ -304,6 +307,7 @@ async function verify() {
       console.log(`    osmisměrka (úkol ${k.id}, ${a.n}×${a.n}): ${a.placements.length} slov, tajenka „${a.leftover}“, podkres „${a.underlay}“`);
       console.log(preview(a, k.ws.spec.underlay?.cells).replace(/^/gm, '      '));
       a.infos.forEach((m) => console.log('    info:', m));
+      k.content.hints.forEach((h) => console.log(`    nápověda po ${h.after_min} min: ${h.text}`));
     }
   }
 
@@ -426,15 +430,16 @@ async function wordsearchCli() {
   if (!file || file.startsWith('--')) fail(['použití: node build.mjs --wordsearch <soubor> [--task=N] [--size=N] [--seed=N] [--reselect]']);
   const abs = path.resolve(file);
   const json = await readJson(abs);
-  let target, selfKey = abs;
+  let target, selfKey = abs, container = null;
   if (Array.isArray(json.words) || json.solution) target = json;
-  else if (json.wordsearch) target = json.wordsearch;
+  else if (json.wordsearch) { target = json.wordsearch; container = json; }
   else if (Array.isArray(json.tasks)) {
     const idx = Number(opt('task', 0)) - 1;
     const t = json.tasks[idx];
     if (!t) fail(['u týmového souboru zadejte --task=N (číslo úkolu s osmisměrkou)']);
     if (t.ref) fail([`úkol ${opt('task')} je odkaz (${t.ref}); spusťte generátor na souboru sdíleného úkolu`]);
     target = t.wordsearch;
+    container = t;
     selfKey = `${abs}#${idx}`;
   }
   if (!target) fail(['v souboru jsem nenašel osmisměrku (objekt se "solution", úkol s "wordsearch" nebo týmový soubor s --task=N)']);
@@ -467,6 +472,9 @@ async function wordsearchCli() {
   console.log(`Tajenka: ${r.analysis.leftover}\nPodkres: ${r.analysis.underlay} (v hranatých závorkách), tajenka malými písmeny\n`);
   console.log(preview(r.analysis, r.cells));
   r.analysis.infos.forEach((m) => console.log('info:', m));
+  for (const h of container?.hints || []) {
+    if (h.text?.includes('{{')) console.log(`Nápověda po ${h.after_min} min: ${expandHint(h.text, target).text}`);
+  }
 
   const rules = POOL.entries.length ? checkRules(r.words, POOL) : { errors: [], warnings: [] };
   rules.warnings.forEach((m) => console.log('VAROVÁNÍ', m));
@@ -478,6 +486,117 @@ async function wordsearchCli() {
     : `Žádné slovo se neopakuje v ostatních osmisměrkách (${grids.length} jiných).`);
 }
 
+// ---------- přegenerování všech osmisměrek najednou ----------
+
+// Všechny osmisměrky: v týmových souborech a ve sdílených úkolech (přes ref, každá jednou).
+async function collectTargets() {
+  const targets = [];
+  const seen = new Set();
+  const files = (await fs.readdir(SRC)).filter((f) => f.endsWith('.json') && f !== 'common.json').sort();
+  for (const f of files) {
+    const abs = path.resolve(SRC, f);
+    const team = await readJson(abs);
+    for (const [i, t] of (team.tasks || []).entries()) {
+      if (t.ref) {
+        const sh = path.resolve(SRC, t.ref + '.json');
+        if (seen.has(sh)) continue;
+        const json = await readJson(sh);
+        if (!json.wordsearch) continue;
+        seen.add(sh);
+        targets.push({ label: t.ref, file: sh, idx: null, spec: json.wordsearch });
+      } else if (t.wordsearch) {
+        targets.push({ label: `${team.team || f} úkol ${i + 1}`, file: abs, idx: i, spec: t.wordsearch });
+      }
+    }
+  }
+  return targets;
+}
+
+const shuffled = (arr, rng) => {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+};
+
+// Cena = počet dvojic mřížek, které sdílejí slovo (součet C(počet,2) přes slova). Nižší je vyváženější.
+function repetitionCost(lists) {
+  const counts = new Map();
+  for (const words of lists) for (const w of words) {
+    const k = POOL.byWord.get(wsNorm(w))?.word || wsNorm(w);
+    counts.set(k, (counts.get(k) || 0) + 1);
+  }
+  return [...counts.values()].reduce((s, c) => s + (c * (c - 1)) / 2, 0);
+}
+
+async function wordsearchAll() {
+  await loadPool([]);
+  if (!POOL.entries.length) fail(['chybí zásobník shared/wordsearch-pool.json']);
+  const targets = await collectTargets();
+  if (!targets.length) fail([`v ${path.relative(ROOT, SRC)} nejsou žádné osmisměrky`]);
+  const seed = Number(opt('seed', 1));
+  const rounds = Number(opt('rounds', 3));
+  const size = opt('size') ? Number(opt('size')) : undefined;
+  const rng = mulberry32(seed);
+  const cur = targets.map(() => null);
+  const usageExcept = (skip) => usageOf(cur.flatMap((r, i) => (r && i !== skip ? [{ label: targets[i].label, words: r.words }] : []))).usage;
+  const make = (i, usedSeed, timeMs) => generateAuto(targets[i].spec, { pool: POOL, usage: usageExcept(i), size, seed: usedSeed, timeMs });
+  const costNow = () => repetitionCost(cur.filter(Boolean).map((r) => r.words));
+
+  if (targets.every((t) => Array.isArray(t.spec.words))) {
+    console.log(`Dosavadní stav: ${repetitionCost(targets.map((t) => t.spec.words))} dvojic mřížek se sdíleným slovem`);
+  }
+  console.log(`Osmisměrek: ${targets.length}, kol vylepšování: až ${rounds}`);
+
+  // kolo 0: zamíchané pořadí, aby výsledek nezávisel na pořadí souborů
+  for (const i of shuffled([...targets.keys()], rng)) {
+    const r = make(i, seed + i * 131, 30000);
+    if (!r.ok) fail([`${targets[i].label}: ${r.report.join(' | ')}`]);
+    cur[i] = r;
+  }
+  let best = costNow();
+  console.log(`kolo 0: ${best}`);
+
+  // další kola: každou mřížku znovu vybrat proti ostatním, přijmout jen zlepšení bez zvětšení mřížky
+  for (let round = 1; round <= rounds; round++) {
+    let improved = false;
+    for (const i of shuffled([...targets.keys()], rng)) {
+      const old = cur[i];
+      const r = make(i, seed + round * 10007 + i * 131, 8000);
+      if (!r.ok || r.size > old.size) continue;
+      cur[i] = r;
+      const c = costNow();
+      if (c < best) { best = c; improved = true; } else cur[i] = old;
+    }
+    console.log(`kolo ${round}: ${best}`);
+    if (!improved || best === 0) break;
+  }
+
+  // zápis (každý soubor jednou)
+  const byFile = new Map();
+  targets.forEach((t, i) => byFile.set(t.file, [...(byFile.get(t.file) || []), i]));
+  for (const [file, idxs] of byFile) {
+    const json = await readJson(file);
+    for (const i of idxs) {
+      const t = targets[i], r = cur[i];
+      const ws = t.idx === null ? json.wordsearch : json.tasks[t.idx].wordsearch;
+      ws.size = r.size; ws.words = r.words; ws.grid = r.grid;
+      ws.underlay = { ...ws.underlay, cells: r.cells };
+    }
+    await fs.writeFile(file, compactArrays(JSON.stringify(json, null, 2)) + '\n');
+  }
+
+  console.log('');
+  targets.forEach((t, i) => console.log(`${t.label.padEnd(16)} ${cur[i].size}×${cur[i].size}, ${cur[i].words.length} slov${cur[i].level ? ' (použito „jen když jinak nevyjde“)' : ''}`));
+  const { usage, where } = usageOf(targets.map((t, i) => ({ label: t.label, words: cur[i].words })));
+  const reps = [...usage].filter(([, c]) => c > 1).sort((a, b) => b[1] - a[1]);
+  console.log(reps.length
+    ? `\nOpakující se slova (${reps.length}): ${reps.map(([k, c]) => `${k} (${c}×: ${where.get(k).join(', ')})`).join('; ')}`
+    : '\nŽádné slovo se neopakuje.');
+  const used = usage.size, total = [...usage.values()].reduce((a, b) => a + b, 0);
+  console.log(`Použito ${used} různých slov v ${total} výskytech, nejvíc výskytů jednoho slova: ${Math.max(...usage.values())}.`);
+  console.log('Zkontrolujte: node build.mjs --verify');
+}
+
 function fail(errors) {
   console.error(`\nCHYBY (${errors.length}):`);
   errors.forEach((m) => console.error(' ✗', m));
@@ -485,6 +604,7 @@ function fail(errors) {
 }
 
 if (flag('new-token')) console.log(randomBytes(18).toString('base64url'));
+else if (flag('wordsearch-all')) await wordsearchAll();
 else if (flag('wordsearch')) await wordsearchCli();
 else if (flag('verify')) await verify();
 else if (flag('cheatsheet')) await cheatsheet();

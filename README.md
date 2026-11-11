@@ -94,10 +94,12 @@ Pak jde zálohovat a verzovat zvlášť a do veřejného repa se nikdy nedostane
 
 - `answer` se nemusí psát, kódem je `solution` (normalizuje se jako vždy).
 - Písmena jsou velká, **diakritika se zachovává, CH jsou dvě políčka**. Velikost 8×8 až 12×12.
+- `node build.mjs --wordsearch-all [--seed=N] [--rounds=N]` přegeneruje **všechny** osmisměrky najednou (týmové i sdílené, slova vybere znovu, existující `words` ignoruje a přepíše soubory). Pořadí souborů nehraje roli: začne se v náhodném pořadí a pak se každá mřížka znovu vybere proti ostatním, přijme se jen řešení, které sníží počet dvojic mřížek se sdíleným slovem (a nezvětší mřížku). Vypíše průběh a opakující se slova. Je deterministický pro stejný `--seed`.
 - `node build.mjs --wordsearch <soubor>` pracuje se souborem, který je samotný objekt osmisměrky, úkol, nebo týmový soubor s `--task=N`. Sdílený úkol (`ref`) pusťte na jeho vlastním souboru v `shared/`.
   - **Bez `words` v souboru** slova vybere ze zásobníku a zvolí nejmenší možnou velikost (8–12). Slova delší než mřížka vynechá.
   - **S `words` v souboru** je bere jako pevný seznam a jen je rozmístí (`--size=` je volitelné). Znovu vybrat slova ze zásobníku: `--reselect` (nebo `words` smazat).
   - Další volby: `--size=N` (pevná velikost), `--seed=N` (jiné rozmístění).
+- **Šablony nápověd:** v `text` nápovědy u osmisměrky jde použít `{{prvni_pismena}}` (první písmena slov, abecedně, např. `A, O, O, V`), `{{slova}}` (celý seznam, abecedně) a `{{pocet}}`. Doplní je build ze slov v mřížce, takže ve zdroji zůstanou šablony a nápověda vždy odpovídá aktuálním slovům (po přegenerování i po ruční úpravě `words`). Neznámá šablona nebo šablona u úkolu bez osmisměrky je chyba.
 - **Počet políček musí sedět:** `size² − délka tajenky = počet obsazených políček`. Když počty nevycházejí (pevný seznam slov), generátor vypíše, kolik písmen slov chybí nebo přebývá.
 
 ### Zásobník slov: `src-data/shared/wordsearch-pool.json`
@@ -137,6 +139,7 @@ node build.mjs --new-token      náhodný token (použijte i jako sůl)
 node build.mjs                  zašifruje src-data/ do docs/data/ a obnoví docs/crypto.js a docs/sw.js
 node build.mjs --verify         dešifruje celý řetěz všech týmů pomocí odpovědí ze zdroje
 node build.mjs --wordsearch <soubor>  vybere slova a vyrobí mřížku osmisměrky (viz výše)
+node build.mjs --wordsearch-all       přegeneruje všechny osmisměrky najednou, slova rozdělí vyváženě
 node build.mjs --cheatsheet     vytvoří cheatsheet.html (v .gitignore) s odpověďmi, nápovědami a odkazy
                                 (--base=https://UZIVATEL.github.io/pasifra/ doplní adresu do odkazů)
 ```
