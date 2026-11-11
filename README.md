@@ -73,7 +73,7 @@ Pak jde zálohovat a verzovat zvlášť a do veřejného repa se nikdy nedostane
 
 ### Osmisměrka jako úkol
 
-Úkol může mít navíc objekt `wordsearch`. Mřížku nepíšete ručně, vyrobí ji generátor:
+Úkol může mít navíc objekt `wordsearch`. Slova i mřížku vyrobí generátor, ve zdroji stačí tajenka a podkres:
 
 ```json
 {
@@ -81,21 +81,52 @@ Pak jde zálohovat a verzovat zvlášť a do veřejného repa se nikdy nedostane
   "body_md": "…",
   "hints": [ … ],
   "wordsearch": {
-    "size": 10,
-    "words": ["OBERHAW", "VORSCHLAG", "OCHS", "…"],
     "solution": "BETLÉMSKÁ KAPLE",
-    "underlay": { "text": "RIC" }
+    "underlay": { "text": "RIC" },
+    "require": ["VORSCHLAG"],
+    "exclude": ["OBERHAW"]
   },
   "item": { "label": "Indicie 3", "text": "Slabika z podkresu: RIC" }
 }
 ```
 
-- `answer` se nemusí psát, kódem je `solution` (normalizuje se jako vždy). Na zbytek úkolu se nic nemění.
+`require` (slova, která tam musí být) a `exclude` (slova, která tam nesmí být) jsou volitelné. Po spuštění generátoru přibude `words`, `size`, `grid` a `underlay.cells` ([řádek, sloupec] od 0).
+
+- `answer` se nemusí psát, kódem je `solution` (normalizuje se jako vždy).
 - Písmena jsou velká, **diakritika se zachovává, CH jsou dvě políčka**. Velikost 8×8 až 12×12.
-- **Počet políček musí sedět:** `size² − délka tajenky = počet obsazených políček`. Slova mají dohromady méně písmen, než je potřeba, jen když se zmenší mřížka, zkrátí tajenka nebo přidají slova. Generátor to spočítá a napíše.
-- `node build.mjs --wordsearch <soubor>` doplní `size`, `grid` a `underlay.cells` ([řádek, sloupec] od 0) zpět do souboru. Soubor může být samotný objekt osmisměrky, úkol, nebo týmový soubor s `--task=N`. Sdílený úkol (`ref`) pusťte na jeho vlastním souboru v `shared/`. Volitelně `--size=`, `--seed=`.
-- Zásobník všech pojmů je `src-data/shared/wordsearch-pool.json` (`{"words": [...]}` nebo pole). Generátor i `--verify` hlídají, že se v mřížce neobjeví jiné slovo ze zásobníku (ani pozpátku). Slovo, které je jen částí slova z téže mřížky, se vypíše jako info.
-- `--verify` (a build) zkontrolují, že každé slovo je v mřížce právě jednou, zbylá písmena dávají přesně `solution` a podkres leží ve slovech v pořadí čtení. Vypíše tajenku, podkres a mřížku (tajenka malými písmeny, podkres v `[ ]`).
+- `node build.mjs --wordsearch <soubor>` pracuje se souborem, který je samotný objekt osmisměrky, úkol, nebo týmový soubor s `--task=N`. Sdílený úkol (`ref`) pusťte na jeho vlastním souboru v `shared/`.
+  - **Bez `words` v souboru** slova vybere ze zásobníku a zvolí nejmenší možnou velikost (8–12). Slova delší než mřížka vynechá.
+  - **S `words` v souboru** je bere jako pevný seznam a jen je rozmístí (`--size=` je volitelné). Znovu vybrat slova ze zásobníku: `--reselect` (nebo `words` smazat).
+  - Další volby: `--size=N` (pevná velikost), `--seed=N` (jiné rozmístění).
+- **Počet políček musí sedět:** `size² − délka tajenky = počet obsazených políček`. Když počty nevycházejí (pevný seznam slov), generátor vypíše, kolik písmen slov chybí nebo přebývá.
+
+### Zásobník slov: `src-data/shared/wordsearch-pool.json`
+
+```json
+{
+  "rules": {
+    "prefer": ["semovani", "pojmy"],
+    "mec": {"min": 1, "max": 2},
+    "vzdalenosti": {"max": 0, "onlyIfNeeded": true},
+    "jmena": {"max": 1}
+  },
+  "words": [
+    {"word": "OBERHAW", "category": "semovani", "family": "haw", "variants": ["OBERHAU"]},
+    {"word": "ČEPEL", "category": "mec", "onlyIfNeeded": true}
+  ]
+}
+```
+
+- **Výběr:** přednost mají kategorie z `prefer`. Kategorie s `min`/`max` se hlídají. `onlyIfNeeded` (u kategorie i u slova) se použije, až když přísná pravidla nevyjdou, a generátor to napíše.
+- **Rodina** (`family`): dvě slova ze stejné rodiny nejsou nikdy v jedné mřížce. `variants` jsou alternativní pravopisy, použije se náhodně jeden.
+- **Opakování napříč mřížkami:** generátor si přečte ostatní osmisměrky v `src-data/` (týmové soubory i sdílené úkoly) a dává přednost slovům, která zatím nepoužil. Po vygenerování vypíše slova, která se opakují, a kde.
+- **Cizí slova:** v mřížce se nesmí objevit žádné jiné slovo ze zásobníku (ani pozpátku). Slovo, které je jen částí slova z téže mřížky (ÚTOK v PROTIÚTOK), se vypíše jako info.
+- **`--verify`** (i build) zkontroluje:
+  - každé slovo je v mřížce právě jednou,
+  - zbylá písmena dávají přesně `solution`,
+  - podkres leží ve slovech v pořadí čtení,
+  - rodiny a kategorie podle `rules` (porušení je chyba, `onlyIfNeeded` jen varování) a slova mimo zásobník (varování).
+  Vypíše tajenku, podkres, mřížku (tajenka malými písmeny, podkres v `[ ]`) a opakování slov napříč mřížkami.
 - Slabika podkresu se týmu ztratí, pokud ji nezapíšete do `item.text`. Build na to upozorní varováním.
 - V klientu tým klepne na začátek a na konec slova (8 směrů, bez tažení), seznam slov se nezobrazuje. Postup se ukládá do `localStorage`. Po nalezení všech slov se zvýrazní zbylá písmena (tajenka) a podkres.
 
@@ -105,7 +136,7 @@ Pak jde zálohovat a verzovat zvlášť a do veřejného repa se nikdy nedostane
 node build.mjs --new-token      náhodný token (použijte i jako sůl)
 node build.mjs                  zašifruje src-data/ do docs/data/ a obnoví docs/crypto.js a docs/sw.js
 node build.mjs --verify         dešifruje celý řetěz všech týmů pomocí odpovědí ze zdroje
-node build.mjs --wordsearch <soubor>  vyrobí mřížku osmisměrky (viz výše)
+node build.mjs --wordsearch <soubor>  vybere slova a vyrobí mřížku osmisměrky (viz výše)
 node build.mjs --cheatsheet     vytvoří cheatsheet.html (v .gitignore) s odpověďmi, nápovědami a odkazy
                                 (--base=https://UZIVATEL.github.io/pasifra/ doplní adresu do odkazů)
 ```

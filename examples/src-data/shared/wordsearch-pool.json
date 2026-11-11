@@ -1,8 +1,57 @@
 {
+  "_note": "Vzorový zásobník pojmů (vymyšlený). category: semovani | pojmy | mec | vzdalenosti | jmena. family: slova se stejnou rodinou se nesmí potkat v jedné mřížce. variants: alternativní pravopis, generátor smí použít jeden z nich.",
+  "rules": {
+    "prefer": ["semovani", "pojmy"],
+    "mec": {"min": 1, "max": 2},
+    "vzdalenosti": {"max": 0, "onlyIfNeeded": true},
+    "jmena": {"max": 1}
+  },
   "words": [
-    "OBERHAW", "UNTERHAW", "VORSCHLAG", "NACHSCHLAG", "ANSETZEN", "ABSETZEN", "NACHREISEN", "DURCHWECHSELN",
-    "ZWERCHHAU", "SCHIELHAU", "KRUMPHAU", "SCHEITELHAU", "INDES", "OCHS", "PFLUG", "TEMPO", "ALBER", "ZUCKEN",
-    "ZÁLUD", "ZÁPAS", "HROT", "ODKROK", "ÚTOK", "PROTIÚTOK", "PARÁDA", "VÝPAD", "ČEPEL", "ÚKLON", "KORD", "ŠAVLE",
-    "RAPÍR", "KLINGA", "EFES", "GARDA", "MEČ", "ODRAZ", "SEKÁČ", "ÚSEK", "STOCK", "FINTA"
+    {"word": "ANSETZEN", "category": "semovani", "family": "setzen"},
+    {"word": "ABSETZEN", "category": "semovani", "family": "setzen"},
+    {"word": "VORSCHLAG", "category": "semovani", "family": "schlag"},
+    {"word": "NACHSCHLAG", "category": "semovani", "family": "schlag"},
+    {"word": "OBERHAW", "category": "semovani", "family": "haw", "variants": ["OBERHAU"]},
+    {"word": "UNTERHAW", "category": "semovani", "family": "haw", "variants": ["UNTERHAU"]},
+    {"word": "NACHREISEN", "category": "semovani"},
+    {"word": "ODKROK", "category": "semovani", "family": "krok"},
+    {"word": "ÚKROK", "category": "semovani", "family": "krok"},
+    {"word": "POSUN", "category": "semovani", "family": "sun"},
+    {"word": "ODSUN", "category": "semovani", "family": "sun"},
+    {"word": "ODVETA", "category": "semovani", "family": "odveta"},
+    {"word": "PROTIODVETA", "category": "semovani", "family": "odveta"},
+    {"word": "INDES", "category": "semovani"},
+    {"word": "VÝPAD", "category": "semovani"},
+    {"word": "PARÁDA", "category": "semovani"},
+    {"word": "OCHS", "category": "semovani"},
+    {"word": "ALBER", "category": "semovani"},
+    {"word": "PFLUG", "category": "semovani"},
+    {"word": "ZUCKEN", "category": "semovani"},
+    {"word": "KRIEG", "category": "semovani"},
+
+    {"word": "HROT", "category": "mec"},
+    {"word": "ŘAP", "category": "mec"},
+    {"word": "JÍLEC", "category": "mec"},
+    {"word": "ZÁŠTITA", "category": "mec"},
+    {"word": "ČEPEL", "category": "mec", "onlyIfNeeded": true},
+
+    {"word": "OPTIMÁLNÍ", "category": "vzdalenosti"},
+    {"word": "KONTAKTNÍ", "category": "vzdalenosti"},
+
+    {"word": "ZÁPAS", "category": "pojmy"},
+    {"word": "ZÁLUD", "category": "pojmy"},
+    {"word": "TEMPO", "category": "pojmy"},
+    {"word": "ÚTOK", "category": "pojmy", "family": "utok"},
+    {"word": "PROTIÚTOK", "category": "pojmy", "family": "utok"},
+    {"word": "STŘET", "category": "pojmy"},
+    {"word": "VÝMĚNA", "category": "pojmy"},
+    {"word": "TĚŽIŠTĚ", "category": "pojmy"},
+    {"word": "PŘÍPRAVA", "category": "pojmy"},
+    {"word": "INICIATIVA", "category": "pojmy"},
+    {"word": "HARA", "category": "pojmy"},
+    {"word": "ROZHODNUTÍ", "category": "pojmy"},
+    {"word": "OHROŽENÍ", "category": "pojmy"},
+
+    {"word": "MEYER", "category": "jmena"}
   ]
 }

@@ -51,54 +51,60 @@
       "hints": [
         {
           "after_min": 10,
-          "text": "Malá nápověda: slova začínají písmeny O, O, V, A, O, I, T, Z, Z, H, P, N, A, P, V, Č."
+          "text": "Malá nápověda: slova začínají písmeny V, P, Ř, Z, A, O, O, O, P, T."
         },
         {
           "after_min": 20,
-          "text": "Velká nápověda: hledáte OBERHAW, ODKROK, VORSCHLAG, ANSETZEN, OCHS, INDES, TEMPO, ZÁLUD, ZÁPAS, HROT, PROTIÚTOK, NACHREISEN, ABSETZEN, PARÁDA, VÝPAD, ČEPEL."
+          "text": "Velká nápověda: hledáte VORSCHLAG, PROTIÚTOK, ŘAP, ZÁLUD, ALBER, ODVETA, OHROŽENÍ, OBERHAW, PŘÍPRAVA, TĚŽIŠTĚ."
         }
       ],
       "wordsearch": {
-        "size": 10,
         "seed": 1,
-        "words": [
-          "OBERHAW",
-          "ODKROK",
-          "VORSCHLAG",
-          "ANSETZEN",
-          "OCHS",
-          "INDES",
-          "TEMPO",
-          "ZÁLUD",
-          "ZÁPAS",
-          "HROT",
-          "PROTIÚTOK",
-          "NACHREISEN",
-          "ABSETZEN",
-          "PARÁDA",
-          "VÝPAD",
-          "ČEPEL"
-        ],
         "solution": "BETLÉMSKÁ KAPLE",
         "underlay": {
           "text": "RIC",
           "cells": [
-            [4,2],
-            [5,4],
-            [8,4]
+            [
+              0,
+              6
+            ],
+            [
+              3,
+              4
+            ],
+            [
+              4,
+              4
+            ]
           ]
         },
+        "require": [
+          "VORSCHLAG",
+          "PROTIÚTOK"
+        ],
+        "size": 9,
+        "words": [
+          "VORSCHLAG",
+          "PROTIÚTOK",
+          "ŘAP",
+          "ZÁLUD",
+          "ALBER",
+          "ODVETA",
+          "OHROŽENÍ",
+          "OBERHAW",
+          "PŘÍPRAVA",
+          "TĚŽIŠTĚ"
+        ],
         "grid": [
-          "DNEZTESNAB",
-          "UOTELEPEČD",
-          "LDNEZTESBA",
-          "ÁKTHMLÉIZP",
-          "ZRRMSPKEÁÝ",
-          "KOTÚITORPV",
-          "TKÁOBERHAW",
-          "PARÁDAKCSA",
-          "VORSCHLAGP",
-          "LOCHSEDNIE"
+          "BEALBERTŘ",
+          "LĚTŠIŽĚTA",
+          "ÉMODVETAP",
+          "KOTÚITORP",
+          "GALHCSROV",
+          "SOBERHAWK",
+          "ÁKAPDULÁZ",
+          "AVARPÍŘPL",
+          "OHROŽENÍE"
         ]
       },
       "item": {

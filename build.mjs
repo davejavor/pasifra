@@ -4,8 +4,8 @@
 //   node build.mjs --verify        dešifruje celý řetěz z vygenerovaných souborů pomocí odpovědí ze zdroje
 //   node build.mjs --new-token     vypíše náhodný token (144 bitů) – použij i jako sůl
 //   node build.mjs --cheatsheet    vytvoří cheatsheet.html (lokální, v .gitignore)
-//   node build.mjs --wordsearch <soubor> [--task=N] [--size=N] [--seed=N]
-//                                  vyrobí mřížku osmisměrky a zapíše grid + underlay.cells zpět do souboru
+//   node build.mjs --wordsearch <soubor> [--task=N] [--size=N] [--seed=N] [--reselect]
+//                                  vybere slova ze zásobníku (nejsou-li v souboru), vyrobí mřížku a zapíše words, grid a underlay.cells
 // Volby: --src=<složka> (výchozí src-data)  --out=<složka> (výchozí docs/data)  --base=<url> (pro cheatsheet)
 
 import { promises as fs } from 'node:fs';
@@ -16,7 +16,7 @@ import {
   DEFAULT_ITER, normalize, deriveKey, deriveNext, secretFromToken,
   encrypt, decrypt, fileId,
 } from './lib/crypto.mjs';
-import { analyze, generate, preview, wsNorm } from './lib/wordsearch.mjs';
+import { analyze, generate, generateAuto, parsePool, checkRules, preview, wsNorm } from './lib/wordsearch.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
@@ -59,16 +59,15 @@ async function resolveRef(obj) {
   return { ...(await readJson(file)), shared: obj.ref };
 }
 
-// Zásobník všech pojmů osmisměrek (kontrola, že se v mřížce neobjeví cizí slovo). Volitelný.
-let POOL = [];
+// Zásobník pojmů osmisměrek (shared/wordsearch-pool.json): kategorie, rodiny, pravidla. Volitelný.
+let POOL = parsePool([]);
 async function loadPool(warnings) {
   const file = path.join(SRC, 'shared', 'wordsearch-pool.json');
   try {
-    const j = JSON.parse(await fs.readFile(file, 'utf8'));
-    POOL = Array.isArray(j) ? j : j.words || [];
+    POOL = parsePool(JSON.parse(await fs.readFile(file, 'utf8')));
   } catch (e) {
-    POOL = [];
-    if (e.code === 'ENOENT') warnings.push('chybí shared/wordsearch-pool.json – cizí slova v osmisměrkách se nehlídají');
+    POOL = parsePool([]);
+    if (e.code === 'ENOENT') warnings.push('chybí shared/wordsearch-pool.json – cizí slova a pravidla osmisměrek se nehlídají');
     else throw new Error(`${path.relative(ROOT, file)}: ${e.message}`);
   }
 }
@@ -93,8 +92,13 @@ async function loadTeam(file, errors, warnings) {
     if (t.id !== undefined && t.id !== i + 1) err(`${where}: id=${t.id} neodpovídá pořadí`);
     let wsContent = null;
     if (t.wordsearch) {
-      const a = analyze(t.wordsearch, POOL);
+      const a = analyze(t.wordsearch, POOL.groups);
       a.errors.forEach((m) => err(`${where}: osmisměrka: ${m}`));
+      if (POOL.entries.length && Array.isArray(t.wordsearch.words)) {
+        const rc = checkRules(t.wordsearch.words, POOL);
+        rc.errors.forEach((m) => err(`${where}: osmisměrka: ${m}`));
+        rc.warnings.forEach((m) => warnings.push(`${name}: ${where}: ${m}`));
+      }
       if (!a.errors.length) {
         wsContent = {
           size: a.n,
@@ -122,7 +126,7 @@ async function loadTeam(file, errors, warnings) {
         id: i + 1,
         shared: t.shared,
         answer: t.answer || '',
-        ws: wsContent ? { spec: t.wordsearch, analysis: analyze(t.wordsearch, POOL) } : null,
+        ws: wsContent ? { spec: t.wordsearch, analysis: analyze(t.wordsearch, POOL.groups) } : null,
         content: {
           id: i + 1,
           title: t.title,
@@ -303,6 +307,21 @@ async function verify() {
     }
   }
 
+  const grids = [], seenG = new Set();
+  for (const t of teams) for (const k of t.tasks) {
+    if (!k.ws) continue;
+    const key = k.shared || `${t.team}#${k.id}`;
+    if (seenG.has(key)) continue;
+    seenG.add(key);
+    grids.push({ label: k.shared || `${t.team} úkol ${k.id}`, words: k.ws.spec.words || [] });
+  }
+  if (grids.length > 1) {
+    const { usage, where } = usageOf(grids);
+    const reps = [...usage].filter(([, c]) => c > 1).sort((x, y) => y[1] - x[1]);
+    console.log(reps.length
+      ? `osmisměrky: ${reps.length} slov se opakuje napříč ${grids.length} mřížkami: ${reps.map(([k, c]) => `${k} (${c}×: ${where.get(k).join(', ')})`).join('; ')}`
+      : `osmisměrky: žádné slovo se neopakuje napříč ${grids.length} mřížkami`);
+  }
   try {
     for (const f of await fs.readdir(OUT)) {
       if (f.endsWith('.json') && !seenFiles.has(f)) warnings.push(`${f} v ${path.relative(ROOT, OUT)} nepatří žádnému týmu`);
@@ -347,38 +366,116 @@ async function cheatsheet() {
 
 // ---------- generátor osmisměrky ----------
 
+// Slova z ostatních osmisměrek (týmové soubory, sdílené úkoly přes ref se počítají jednou).
+async function collectGrids(skipKey) {
+  const grids = [];
+  const seen = new Set();
+  const files = (await fs.readdir(SRC)).filter((f) => f.endsWith('.json') && f !== 'common.json').sort();
+  for (const f of files) {
+    let team;
+    try { team = await readJson(path.join(SRC, f)); } catch { continue; }
+    for (const [i, t] of (team.tasks || []).entries()) {
+      let ws, key, label;
+      if (t.ref) {
+        const abs = path.resolve(SRC, t.ref + '.json');
+        try { ws = (await readJson(abs)).wordsearch; } catch { continue; }
+        key = abs; label = t.ref;
+      } else if (t.wordsearch) {
+        ws = t.wordsearch; key = `${path.resolve(SRC, f)}#${i}`; label = `${team.team || f} úkol ${i + 1}`;
+      }
+      if (!ws || !Array.isArray(ws.words) || key === skipKey || seen.has(key)) continue;
+      seen.add(key);
+      grids.push({ label, words: ws.words });
+    }
+  }
+  return grids;
+}
+
+// Počty použití slov (klíč = slovo ze zásobníku, jinak vlastní text) a kde se použila.
+function usageOf(grids) {
+  const usage = new Map(), where = new Map();
+  for (const g of grids) {
+    for (const w of g.words) {
+      const t = wsNorm(w);
+      const key = POOL.byWord.get(t)?.word || t;
+      usage.set(key, (usage.get(key) || 0) + 1);
+      where.set(key, [...(where.get(key) || []), g.label]);
+    }
+  }
+  return { usage, where };
+}
+
+function compactArrays(text) {
+  return text
+    .replace(/\[\s*(\d+),\s*(\d+)\s*\]/g, '[$1,$2]')
+    .replace(/("(?:words|require|exclude)": )\[\s*((?:"[^"\n]*",?\s*)+)\]/g, (_, k, body) => `${k}[${body.trim().replace(/\s*\n\s*/g, ' ')}]`);
+}
+
+function printWords(words) {
+  const byCat = new Map();
+  for (const w of words) {
+    const cat = POOL.byWord.get(wsNorm(w))?.category || '(mimo zásobník)';
+    byCat.set(cat, [...(byCat.get(cat) || []), wsNorm(w)]);
+  }
+  console.log(`Slova (${words.length}):`);
+  for (const [cat, ws] of byCat) console.log(`  ${cat} (${ws.length}): ${ws.join(', ')}`);
+}
+
 async function wordsearchCli() {
   const file = args[args.indexOf('--wordsearch') + 1];
-  if (!file || file.startsWith('--')) fail(['použití: node build.mjs --wordsearch <soubor> [--task=N] [--size=N] [--seed=N]']);
+  if (!file || file.startsWith('--')) fail(['použití: node build.mjs --wordsearch <soubor> [--task=N] [--size=N] [--seed=N] [--reselect]']);
   const abs = path.resolve(file);
   const json = await readJson(abs);
-  let target;
-  if (Array.isArray(json.words)) target = json;
+  let target, selfKey = abs;
+  if (Array.isArray(json.words) || json.solution) target = json;
   else if (json.wordsearch) target = json.wordsearch;
   else if (Array.isArray(json.tasks)) {
-    const t = json.tasks[Number(opt('task', 0)) - 1];
+    const idx = Number(opt('task', 0)) - 1;
+    const t = json.tasks[idx];
     if (!t) fail(['u týmového souboru zadejte --task=N (číslo úkolu s osmisměrkou)']);
     if (t.ref) fail([`úkol ${opt('task')} je odkaz (${t.ref}); spusťte generátor na souboru sdíleného úkolu`]);
     target = t.wordsearch;
+    selfKey = `${abs}#${idx}`;
   }
-  if (!target) fail(['v souboru jsem nenašel osmisměrku (objekt s "words", úkol s "wordsearch" nebo týmový soubor s --task=N)']);
+  if (!target) fail(['v souboru jsem nenašel osmisměrku (objekt se "solution", úkol s "wordsearch" nebo týmový soubor s --task=N)']);
 
-  const pool = [];
   await loadPool([]);
-  pool.push(...POOL);
   const size = opt('size') ? Number(opt('size')) : target.size;
-  const r = generate(target, { pool, size, seed: Number(opt('seed', target.seed ?? 1)) });
+  const seed = Number(opt('seed', target.seed ?? 1));
+  const auto = !Array.isArray(target.words) || flag('reselect');
+  const grids = await collectGrids(selfKey);
+  const { usage, where } = usageOf(grids);
+
+  let r;
+  if (auto) {
+    // size ze souboru bereme jako pevné jen při --size=; jinak se hledá nejmenší možná
+    r = generateAuto(target, { pool: POOL, usage, size: opt('size') ? Number(opt('size')) : undefined, seed });
+  } else {
+    r = generate(target, { pool: POOL.groups, size, seed });
+    if (r.ok) r.words = target.words;
+  }
   if (!r.ok) { console.error(r.report.join('\n')); process.exit(1); }
 
   target.size = r.size;
+  target.words = r.words;
   target.grid = r.grid;
   target.underlay = { ...target.underlay, cells: r.cells };
-  const text = JSON.stringify(json, null, 2).replace(/\[\s*(\d+),\s*(\d+)\s*\]/g, '[$1,$2]');
-  await fs.writeFile(abs, text + '\n');
-  console.log(`Hotovo: ${r.size}×${r.size}, ${r.attempts}. pokus. Zapsáno do ${path.relative(process.cwd(), abs)}.`);
+  await fs.writeFile(abs, compactArrays(JSON.stringify(json, null, 2)) + '\n');
+
+  console.log(`Hotovo: ${r.size}×${r.size}, ${r.attempts}. pokus, ${auto ? 'slova vybrána ze zásobníku' : 'pevný seznam slov'}. Zapsáno do ${path.relative(process.cwd(), abs)}.`);
+  printWords(r.words);
   console.log(`Tajenka: ${r.analysis.leftover}\nPodkres: ${r.analysis.underlay} (v hranatých závorkách), tajenka malými písmeny\n`);
   console.log(preview(r.analysis, r.cells));
   r.analysis.infos.forEach((m) => console.log('info:', m));
+
+  const rules = POOL.entries.length ? checkRules(r.words, POOL) : { errors: [], warnings: [] };
+  rules.warnings.forEach((m) => console.log('VAROVÁNÍ', m));
+  rules.errors.forEach((m) => console.log('CHYBA pravidel:', m));
+  if (r.level) console.log(`Poznámka: přísná pravidla nevyšla, použil jsem i položky „jen když jinak nevyjde“ (úroveň ${r.level}).`);
+  const reps = r.words.map((w) => POOL.byWord.get(wsNorm(w))?.word || wsNorm(w)).filter((k) => usage.has(k));
+  console.log(reps.length
+    ? `Opakování oproti ostatním osmisměrkám (${grids.length} jiných): ${reps.map((k) => `${k} (${where.get(k).join(', ')})`).join('; ')}`
+    : `Žádné slovo se neopakuje v ostatních osmisměrkách (${grids.length} jiných).`);
 }
 
 function fail(errors) {
