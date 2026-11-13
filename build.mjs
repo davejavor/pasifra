@@ -15,7 +15,7 @@ import { randomBytes } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  DEFAULT_ITER, normalize, deriveKey, deriveNext, secretFromToken,
+  DEFAULT_ITER, normalize, deriveKey, deriveNext, secretFromToken, unlockNext, makeAccept,
   encrypt, decrypt, fileId,
 } from './lib/crypto.mjs';
 import { analyze, generate, generateAuto, parsePool, checkRules, expandHint, mulberry32, preview, wsNorm } from './lib/wordsearch.mjs';
@@ -114,6 +114,10 @@ async function loadTeam(file, errors, warnings) {
       if (t.answer && normalize(t.answer) !== normalize(t.wordsearch.solution || '')) err(`${where}: "answer" neodpovídá tajence osmisměrky`);
       t.answer = t.answer || t.wordsearch.solution;
     }
+    if (t.answer_contains) {
+      if (!Array.isArray(t.answer_contains) || !t.answer_contains.length || t.answer_contains.length > 4 || t.answer_contains.some((k) => normalize(k).length < 3)) err(`${where}: "answer_contains" má být 1–4 klíčová slova o délce aspoň 3 znaky`);
+      else t.answer = t.answer || t.answer_contains[0];
+    }
     for (const k of ['title', 'body_md', 'answer']) if (!t[k] || typeof t[k] !== 'string') err(`${where}: chybí "${k}"`);
     if (t.answer && normalize(t.answer).length < 1) err(`${where}: odpověď je po normalizaci prázdná`);
     if (!t.item || !t.item.label || !t.item.text) err(`${where}: chybí "item" (label + text)`);
@@ -129,10 +133,12 @@ async function loadTeam(file, errors, warnings) {
         id: i + 1,
         shared: t.shared,
         answer: t.answer || '',
+        contains: t.answer_contains || null,
         ws: wsContent ? { spec: t.wordsearch, analysis: analyze(t.wordsearch, POOL.groups) } : null,
         content: {
           id: i + 1,
           title: t.title,
+          ...(t.code_label ? { code_label: t.code_label } : {}),
           body_md: t.body_md,
           image: await imageToDataUrl(t.image),
           hints: hints.map((h) => ({ after_min: h.after_min, text: expandHint(h.text, t.wordsearch).text })),
@@ -223,7 +229,13 @@ function metaOf(team) {
 async function encryptTeam(team) {
   const keys = await chainKeys(team);
   const out = { v: 1, iter: ITER, salt: team.salt, meta: await encrypt(keys.meta, metaOf(team)), tasks: [] };
-  for (const t of team.tasks) out.tasks.push(await encrypt(keys.tasks[t.id - 1], t.content));
+  for (const t of team.tasks) {
+    const slot = t.id === team.tasks.length ? 'finale' : t.id + 1;
+    const content = t.contains
+      ? { ...t.content, accept: await makeAccept(keys.tasks[t.id - 1], t.contains, t.answer, team.salt, slot, ITER) }
+      : t.content;
+    out.tasks.push(await encrypt(keys.tasks[t.id - 1], content));
+  }
   out.finale = await encrypt(keys.finale, team.finale);
   return out;
 }
@@ -289,6 +301,7 @@ async function verify() {
       const blob = data.tasks[k.id - 1];
       if (!blob) break;
       const got = await decrypt(key, blob);
+      const accept = got?.accept; if (got) delete got.accept;
       if (!got || !same(got, k.content)) { e(`úkol ${k.id} se nedešifruje správným řetězem klíčů`); break; }
       const slot = k.id === t.tasks.length ? 'finale' : k.id + 1;
       const next = k.id === t.tasks.length ? data.finale : data.tasks[k.id];
@@ -296,6 +309,16 @@ async function verify() {
       // špatný kód s dobrým klíčem, správný kód se špatným klíčem (izolované lámání)
       if (await decrypt(await deriveNext(key, k.answer + 'x', t.salt, slot, ITER), next)) e(`po úkolu ${k.id} jde otevřít další špatným kódem`);
       if (await decrypt(await deriveNext(bogus, k.answer, t.salt, slot, ITER), next)) e(`po úkolu ${k.id} jde otevřít další bez předchozího klíče`);
+      if (k.contains) {
+        if (!accept) e(`úkol ${k.id}: chybí obálky pro "answer_contains"`);
+        else {
+          for (const kw of k.contains) {
+            const r = await unlockNext(key, `Socha ${kw}ova, prosím!`, accept, t.salt, slot, next, ITER);
+            if (!r) e(`úkol ${k.id}: klíčové slovo „${kw}“ uprostřed textu neodemyká`);
+          }
+          if (await unlockNext(key, 'tohle tam urcite neni 12345', accept, t.salt, slot, next, ITER)) e(`úkol ${k.id}: odemyká i text bez klíčového slova`);
+        }
+      } else if (accept) e(`úkol ${k.id}: nečekané obálky`);
       key = nextKey;
     }
     const fin = await decrypt(key, data.finale);
@@ -351,7 +374,7 @@ async function cheatsheet() {
   ${t.tasks.map((k) => `
   <article>
     <h3>${k.id}. ${esc(k.content.title)}${k.shared ? ` <em>(společné: ${esc(k.shared)})</em>` : ''}</h3>
-    <p><b>Kód:</b> ${esc(k.answer)} <code>${esc(normalize(k.answer))}</code></p>
+    <p><b>Kód:</b> ${k.contains ? 'stačí, když odpověď obsahuje: ' + esc(k.contains.map(normalize).join(' / ')) : esc(k.answer) + ' <code>' + esc(normalize(k.answer)) + '</code>'}</p>
     <p><b>Zadání:</b> ${nl(k.content.body_md)}</p>
     <ul>${k.content.hints.map((h) => `<li>po ${h.after_min} min: ${nl(h.text)}</li>`).join('')}</ul>
     ${k.ws ? `<p><b>Osmisměrka:</b> tajenka <code>${esc(k.ws.analysis.leftover)}</code>, podkres <code>${esc(k.ws.analysis.underlay)}</code>, slova: ${esc(k.ws.spec.words.join(', '))}</p>` : ''}

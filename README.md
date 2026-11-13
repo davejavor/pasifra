@@ -70,6 +70,8 @@ Pak jde zálohovat a verzovat zvlášť a do veřejného repa se nikdy nedostane
 - **Společné úkoly** jsou v `src-data/shared/<nazev>.json` (stejná pole jako úkol) a v týmu se odkazují přes `{ "ref": "shared/<nazev>" }`. Může být na libovolné pozici řetězu. Oba týmy páru pak zadávají stejný kód.
 - `finale` je závěrečná obrazovka (`title`, `body_md`, volitelně `image`), odemkne se kódem posledního úkolu.
 - Každý úkol má přesně 2 nápovědy s `after_min` vzestupně.
+- **Volnější odpověď:** místo `answer` jde napsat `"answer_contains": ["karel", "karl"]` (1–4 klíčová slova, aspoň 3 znaky). Odpověď pak projde, když klíčové slovo kdekoli obsahuje („socha Karla IV.“). Pište kmeny slov kvůli skloňování. V datech jsou jen zašifrované obálky, nic čitelného.
+- `code_label` (volitelné) je popisek nad polem pro odpověď, výchozí je „Odpověď“.
 
 ### Osmisměrka jako úkol
 

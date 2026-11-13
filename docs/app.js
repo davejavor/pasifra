@@ -1,6 +1,6 @@
 import { CONFIG } from './config.js';
 import { mountWordSearch } from './wordsearch.js';
-import { fileId, secretFromToken, deriveKey, deriveNext, exportKey, importKey, decrypt, normalize } from './crypto.js';
+import { fileId, secretFromToken, deriveKey, deriveNext, exportKey, importKey, decrypt, normalize, unlockNext } from './crypto.js';
 
 const params = new URLSearchParams(location.search);
 const token = params.get('t');
@@ -158,7 +158,7 @@ async function renderTask() {
     <div class="card"><h2>${i + 1}. ${esc(c.title)}</h2>${img(c.image)}${md(c.body_md)}</div>
     ${c.wordsearch ? '<div class="card" id="wsmount"></div>' : ''}
     <form id="f" autocomplete="off">
-      <label for="code" class="dim">Kód z místa</label>
+      <label for="code" class="dim">${esc(c.code_label || 'Odpověď')}</label>
       <input id="code" type="text" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="go">
       <div class="msg" id="msg" role="status"></div>
       <button type="submit" id="go">Odemknout další úkol</button>
@@ -226,14 +226,15 @@ async function onSubmit(e) {
   e.preventDefault();
   const raw = $('code').value;
   const msg = $('msg'), go = $('go');
-  if (!normalize(raw)) { msg.textContent = 'Napište kód, který jste našli.'; return; }
+  if (!normalize(raw)) { msg.textContent = 'Napište odpověď.'; return; }
   go.disabled = true; msg.textContent = 'Ověřuji…';
   const cur = unlocked();
   const last = cur === meta.tasks;
-  const key = await deriveNext(K.tasks[cur - 1], raw, data.salt, last ? 'finale' : cur + 1, data.iter);
-  const got = await decrypt(key, last ? data.finale : data.tasks[cur]);
+  const cc = await content(cur - 1);
+  const res = await unlockNext(K.tasks[cur - 1], raw, cc && cc.accept, data.salt, last ? 'finale' : cur + 1, last ? data.finale : data.tasks[cur], data.iter);
+  const key = res && res.key;
   go.disabled = false;
-  if (!got) { msg.textContent = WRONG[wrongCount++ % WRONG.length]; $('code').select(); return; }
+  if (!res) { msg.textContent = WRONG[wrongCount++ % WRONG.length]; $('code').select(); return; }
   const exp = await exportKey(key);
   if (last) { K.finale = key; S.keys.finale = exp; } else { K.tasks.push(key); S.keys.tasks.push(exp); S.at.push(now()); }
   saveState();
