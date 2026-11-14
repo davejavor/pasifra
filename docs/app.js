@@ -154,8 +154,15 @@ async function renderTask() {
   if (S.at[i] == null) { S.at[i] = now(); saveState(); }
   const c = await content(i);
   if (!c) return broken();
-  main.innerHTML = `
-    <div class="card"><h2>${i + 1}. ${esc(c.title)}</h2>${img(c.image)}${md(c.body_md)}</div>
+  // Předchozí úkoly zůstávají nad aktuálním; poslední vyřešený je rozbalený.
+  let prev = '';
+  for (let j = 0; j < i; j++) {
+    const p = await content(j);
+    if (!p) continue;
+    prev += `<details class="card done"${j === i - 1 ? ' open' : ''}><summary><h3>✓ ${j + 1}. ${esc(p.title)}</h3></summary>${img(p.image)}${p.body_md ? md(p.body_md) : ''}</details>`;
+  }
+  main.innerHTML = `${prev}
+    <div class="card" id="current"><h2>${i + 1}. ${esc(c.title)}</h2>${img(c.image)}${c.body_md ? md(c.body_md) : ''}</div>
     ${c.wordsearch ? '<div class="card" id="wsmount"></div>' : ''}
     <form id="f" autocomplete="off">
       <label for="code" class="dim">${esc(c.code_label || 'Odpověď')}</label>
@@ -176,7 +183,9 @@ async function renderTask() {
   }
   taskCtx = { c, i };
   renderHints();
+  if (i > 0 && lastScrolled !== i) { lastScrolled = i; $('current').scrollIntoView({ block: 'start' }); }
 }
+let lastScrolled = -1;
 
 // Samostatně, aby odemknutí nápovědy nesmazalo rozepsaný kód ani výběr v osmisměrce.
 function renderHints() {
@@ -198,7 +207,7 @@ async function renderSolved() {
   for (let i = n - 1; i >= 0; i--) {
     const c = await content(i);
     if (!c) continue;
-    html += `<div class="card"><h3>✓ ${i + 1}. ${esc(c.title)}</h3>${img(c.image)}${md(c.body_md)}
+    html += `<div class="card"><h3>✓ ${i + 1}. ${esc(c.title)}</h3>${img(c.image)}${c.body_md ? md(c.body_md) : ''}
       ${c.hints.map((h) => `<div class="hint">${md(h.text)}</div>`).join('')}</div>`;
   }
   main.innerHTML = html;

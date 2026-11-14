@@ -118,7 +118,9 @@ async function loadTeam(file, errors, warnings) {
       if (!Array.isArray(t.answer_contains) || !t.answer_contains.length || t.answer_contains.length > 4 || t.answer_contains.some((k) => normalize(k).length < 3)) err(`${where}: "answer_contains" má být 1–4 klíčová slova o délce aspoň 3 znaky`);
       else t.answer = t.answer || t.answer_contains[0];
     }
-    for (const k of ['title', 'body_md', 'answer']) if (!t[k] || typeof t[k] !== 'string') err(`${where}: chybí "${k}"`);
+    for (const k of ['title', 'answer']) if (!t[k] || typeof t[k] !== 'string') err(`${where}: chybí "${k}"`);
+    if (typeof t.body_md !== 'string') err(`${where}: chybí "body_md" (může být prázdný řetězec)`);
+    if (!t.body_md && !t.image && !t.wordsearch) err(`${where}: úkol nemá text ani obrázek`);
     if (t.answer && normalize(t.answer).length < 1) err(`${where}: odpověď je po normalizaci prázdná`);
     if (!t.item || !t.item.label || !t.item.text) err(`${where}: chybí "item" (label + text)`);
     const hints = t.hints || [];
@@ -286,7 +288,7 @@ async function verify() {
     if (data.tasks.length !== t.tasks.length) e(`počet úkolů v souboru ${data.tasks.length} ≠ zdroj ${t.tasks.length}`);
 
     // nic čitelného
-    const leaks = [t.token, ...t.tasks.flatMap((k) => [k.answer, normalize(k.answer), k.content.title, k.content.body_md.slice(0, 25)])];
+    const leaks = [t.token, ...t.tasks.flatMap((k) => [k.answer, normalize(k.answer), k.content.title, ...(k.content.body_md ? [k.content.body_md.slice(0, 25)] : [])])];
     for (const s of leaks) if (s && s.length >= 6 && text.includes(s)) e(`v souboru je čitelné "${s}"`);
 
     const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
