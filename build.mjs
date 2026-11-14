@@ -122,7 +122,7 @@ async function loadTeam(file, errors, warnings) {
     if (t.answer && normalize(t.answer).length < 1) err(`${where}: odpověď je po normalizaci prázdná`);
     if (!t.item || !t.item.label || !t.item.text) err(`${where}: chybí "item" (label + text)`);
     const hints = t.hints || [];
-    if (hints.length !== 2) err(`${where}: očekávám 2 nápovědy, je jich ${hints.length}`);
+    if (hints.length !== 0 && hints.length !== 2) err(`${where}: očekávám 0 nebo 2 nápovědy, je jich ${hints.length}`);
     hints.forEach((h, j) => {
       if (typeof h.after_min !== 'number' || h.after_min < 0 || !h.text) err(`${where}: nápověda ${j + 1} je neplatná`);
       if (j > 0 && h.after_min <= hints[j - 1].after_min) err(`${where}: nápovědy musí jít časově vzestupně`);

@@ -163,7 +163,7 @@ async function renderTask() {
       <div class="msg" id="msg" role="status"></div>
       <button type="submit" id="go">Odemknout další úkol</button>
     </form>
-    <div class="card"><p class="dim" id="nexthint"></p><div id="hints"></div></div>
+    ${c.hints.length ? '<div class="card"><p class="dim" id="nexthint"></p><div id="hints"></div></div>' : ''}
     <button class="stuck" id="stuck">Zasekli jsme se</button>`;
   $('stuck').onclick = () => { view = 'contact'; render(); };
   $('f').onsubmit = onSubmit;
