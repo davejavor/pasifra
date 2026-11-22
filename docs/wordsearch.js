@@ -3,6 +3,8 @@
 // storage = { load(): number[], save(number[]) } – indexy nalezených slov.
 
 const MSG_OTHER = 'Tohle mezi pojmy nepatří.';
+const MSG_DONE = 'Všechna slova máte! Zbylá zvýrazněná písmena čtěte po řádcích zleva doprava a shora dolů.';
+const MSG_DONE_SHAPE = 'Všechna slova máte! Modře je písmeno, které slova nakreslila. Zlatá písmena čtěte po řádcích zleva doprava a shora dolů.';
 
 export function mountWordSearch(el, ws, storage) {
   const n = ws.size;
@@ -59,7 +61,7 @@ export function mountWordSearch(el, ws, storage) {
       else {
         found.add(exact);
         storage.save([...found]);
-        say(done() ? 'Všechna slova máte! Zbylá zvýrazněná písmena čtěte po řádcích zleva doprava a shora dolů.' : 'Nalezeno!');
+        say(done() ? (ws.shape ? MSG_DONE_SHAPE : MSG_DONE) : 'Nalezeno!');
       }
     } else {
       const host = wordCells.findIndex((wc) => wc.length > line.length && line.every((x) => wc.includes(x)));
@@ -75,5 +77,5 @@ export function mountWordSearch(el, ws, storage) {
   });
   el.querySelector('#ws-cancel').addEventListener('click', () => { start = null; say(''); paint(); });
   paint();
-  if (done()) say('Všechna slova máte! Zbylá zvýrazněná písmena čtěte po řádcích zleva doprava a shora dolů.');
+  if (done()) say(ws.shape ? MSG_DONE_SHAPE : MSG_DONE);
 }

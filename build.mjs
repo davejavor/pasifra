@@ -107,11 +107,15 @@ async function loadTeam(file, errors, warnings) {
           grid: a.rows.map((r) => r.join('')),
           words: a.placements.map(({ r, c, dr, dc, len }) => ({ r, c, dr, dc, len })),
           underlay: t.wordsearch.underlay.cells,
+          ...(t.wordsearch.mode === 'shape' ? { shape: true } : {}),
         };
         const hay = wsNorm(t.item?.text);
-        if (!hay.includes(wsNorm(t.wordsearch.underlay.text))) warnings.push(`${name}: ${where}: item.text neobsahuje slabiku podkresu „${t.wordsearch.underlay.text}“`);
+        if (t.wordsearch.mode !== 'shape' && !hay.includes(wsNorm(t.wordsearch.underlay.text))) warnings.push(`${name}: ${where}: item.text neobsahuje slabiku podkresu „${t.wordsearch.underlay.text}“`);
       }
-      if (t.answer && normalize(t.answer) !== normalize(t.wordsearch.solution || '')) err(`${where}: "answer" neodpovídá tajence osmisměrky`);
+      if (t.wordsearch.mode === 'shape') {
+        // tajenka je věta, odpověď je místo v ní (answer_contains)
+        if (!t.answer_contains || !t.answer_contains.some((k) => normalize(t.wordsearch.solution).includes(normalize(k)))) err(`${where}: osmisměrka s písmenem potřebuje "answer_contains" s kmenem, který je v tajence`);
+      } else if (t.answer && normalize(t.answer) !== normalize(t.wordsearch.solution || '')) err(`${where}: "answer" neodpovídá tajence osmisměrky`);
       t.answer = t.answer || t.wordsearch.solution;
     }
     if (t.answer_one_of) {
