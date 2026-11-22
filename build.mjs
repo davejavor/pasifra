@@ -154,7 +154,11 @@ async function loadTeam(file, errors, warnings) {
           body_md: t.body_md,
           image: await imageToDataUrl(t.image),
           hints: hints.map((h) => ({ after_min: h.after_min, text: expandHint(h.text, t.wordsearch).text })),
-          item: t.item ? { label: t.item.label, text: t.item.text, image: await imageToDataUrl(t.item.image) } : null,
+          item: t.item ? {
+            label: t.item.label, text: t.item.text, image: await imageToDataUrl(t.item.image),
+            ...(t.item.show === false ? { show: false } : {}),
+            ...(t.item.solve ? { solve: { label: t.item.solve.label, answer: t.item.solve.answer } } : {}),
+          } : null,
           ...(wsContent ? { wordsearch: wsContent } : {}),
         },
       });

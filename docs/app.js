@@ -213,15 +213,34 @@ async function renderSolved() {
   main.innerHTML = html;
 }
 
+// Útržky: jen předměty bez show:false. Útržek se "solve" si tým může dořešit (kontrola podle písmen, pořadí nevadí).
+const sortedLetters = (x) => [...normalize(x)].sort().join('');
 async function renderItems() {
   const n = solvedCount();
-  if (!n) { main.innerHTML = '<div class="card"><h2>Nalezené předměty</h2><p class="dim">Zatím nic. Každý vyřešený úkol přidá jeden předmět.</p></div>'; return; }
-  let html = '<h2>Nalezené předměty</h2>';
+  const list = [];
   for (let i = 0; i < n; i++) {
     const it = (await content(i))?.item;
-    if (it) html += `<div class="card"><h3>${esc(it.label)}</h3>${img(it.image)}${md(it.text)}</div>`;
+    if (it && it.show !== false) list.push({ it, i });
+  }
+  if (!list.length) { main.innerHTML = '<div class="card"><h2>Útržky</h2><p class="dim">Zatím nic. Útržky přibývají s vyřešenými úkoly.</p></div>'; return; }
+  let html = '<h2>Útržky</h2>';
+  for (const { it, i } of list) {
+    const key = `pasifra:solve:${id}:${i}`;
+    const done = it.solve && store.get(key) === '1';
+    html += `<div class="card"><h3>${esc(it.label)}</h3>${img(it.image)}${it.image ? '' : md(it.text)}
+      ${it.solve ? (done
+        ? `<p class="ok">✓ ${esc(it.solve.answer)}</p>`
+        : `<form class="solve" data-i="${i}" autocomplete="off"><label class="dim" for="s${i}">${esc(it.solve.label)}</label>
+           <input id="s${i}" type="text" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
+           <div class="msg" role="status"></div><button type="submit">Ověřit</button></form>`) : ''}</div>`;
   }
   main.innerHTML = html;
+  main.querySelectorAll('form.solve').forEach((f) => f.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const i = Number(f.dataset.i), it = (await content(i)).item, v = f.querySelector('input').value;
+    if (v && sortedLetters(v) === sortedLetters(it.solve.answer)) { store.set(`pasifra:solve:${id}:${i}`, '1'); renderItems(); }
+    else f.querySelector('.msg').textContent = 'Zatím ne. Zkuste to znovu.';
+  }));
 }
 
 function renderContact() {
