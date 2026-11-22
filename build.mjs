@@ -380,7 +380,7 @@ async function cheatsheet() {
   const { errors, teams } = await loadAll();
   if (errors.length) fail(errors);
   const nl = (s) => esc(s).replace(/\n/g, '<br>');
-  const sections = teams.map((t) => `
+  const sections = [...teams].sort((a, b) => a.name.localeCompare(b.name, 'cs', { numeric: true })).map((t) => `
 <section>
   <h2>${esc(t.name)} <small>(${esc(t.team)})</small></h2>
   <p>Odkaz: <a href="${esc(BASE)}?t=${esc(t.token)}">${esc(BASE)}?t=${esc(t.token)}</a></p>
@@ -395,10 +395,18 @@ async function cheatsheet() {
   </article>`).join('')}
   <article><h3>Finále: ${esc(t.finale.title)}</h3><p>${nl(t.finale.body_md)}</p></article>
 </section>`).join('\n');
+  // Rychlý průchod: co napsat do políček, tým po týmu
+  const nowQ = '&now=' + (process.argv.find((a) => a.startsWith('--now='))?.slice(6) || '2026-12-12T14:30') + '&reset=1';
+  const quick = `
+<h2>Rychlý průchod (testování)</h2>
+<p>Odkaz otevře hru v čase startu a smaže uložený postup. Do políček pište odpovědi zleva doprava. Po testech každý tým otevřít ještě jednou s <code>&amp;reset=1</code>.</p>
+<div class="wrap"><table><tr><th>Tým</th>${teams[0].tasks.map((k) => `<th>${k.id}. ${esc(k.content.title)}</th>`).join('')}</tr>
+${[...teams].sort((a, b) => a.name.localeCompare(b.name, 'cs', { numeric: true })).map((t) => `<tr><td><a href="${esc(BASE)}?t=${esc(t.token)}${nowQ}"><b>${esc(t.name)}</b></a></td>${t.tasks.map((k) => `<td><b>${esc(k.ws ? k.ws.analysis.leftover : k.answer)}</b>${k.contains && k.contains.length > 1 ? `<br><small>${k.exact ? 'nebo' : 'obsahuje'}: ${esc(k.contains.join(' / '))}</small>` : ''}</td>`).join('')}</tr>`).join('\n')}
+</table></div>`;
   const html = `<!doctype html><html lang="cs"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cheatsheet pro orgy</title>
-<style>body{font:16px/1.5 system-ui;max-width:50rem;margin:1rem auto;padding:0 1rem}section{border-top:3px solid #888;margin-top:2rem}article{margin:1rem 0;padding:.5rem 1rem;background:#f4f1e8}code{background:#ddd;padding:0 .3em}small,em{color:#666}</style>
-<h1>Cheatsheet – jen pro orgy, nesdílet</h1>${sections}`;
+<style>body{font:16px/1.5 system-ui;max-width:50rem;margin:1rem auto;padding:0 1rem}section{border-top:3px solid #888;margin-top:2rem}article{margin:1rem 0;padding:.5rem 1rem;background:#f4f1e8}code{background:#ddd;padding:0 .3em}.wrap{overflow-x:auto}table{border-collapse:collapse;font-size:14px}td,th{border:1px solid #bbb;padding:.3rem .5rem;vertical-align:top;text-align:left}th{background:#e6e0cf}small,em{color:#666}</style>
+<h1>Cheatsheet – jen pro orgy, nesdílet</h1>${quick}<h2>Detail po týmech</h2>${sections}`;
   const out = path.join(ROOT, 'cheatsheet.html');
   await fs.writeFile(out, html);
   console.log('Vytvořeno', path.relative(ROOT, out));
