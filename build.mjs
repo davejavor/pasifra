@@ -276,6 +276,10 @@ async function build() {
   const sw = await fs.readFile(path.join(ROOT, 'lib/sw.template.js'), 'utf8');
   await fs.writeFile(path.join(docs, 'sw.js'), sw.replaceAll('__BUILD__', new Date().toISOString().replace(/\D/g, '').slice(0, 14)));
   await fs.writeFile(path.join(docs, '.nojekyll'), '');
+  // org.html: adresa sledovacího skriptu a klíč pro čtení (z common.json)
+  const common = await readJson(path.join(SRC, 'common.json')).catch(() => ({}));
+  const dep = (common.track_url || '').match(/\/macros\/s\/([^/]+)\/exec/)?.[1] || '';
+  await fs.writeFile(path.join(docs, 'org-config.js'), `window.ORG = ${JSON.stringify({ dep, key: common.track_key || '' })};\n`);
   console.log('Hotovo. Doporučuju hned spustit: node build.mjs --verify');
 }
 

@@ -36,11 +36,12 @@
   <h2 style="font-size:1rem;color:var(--accent)">Poslední zprávy</h2>
   <div id="log"></div>
 </main>
+<script src="org-config.js"></script>
 <script>
 // Čte Google tabulku přes Apps Script (?u=<ID nasazení>&k=<klíč>). Týmy posílají zprávu při každém vyřešeném úkolu.
 const TASKS = 6, TEAMS = ['hus', 'vaclav', 'zizka', 'libuse', 'bruncvik', 'karel'];
 const NAMES = { hus: 'Tým 1', vaclav: 'Tým 2', zizka: 'Tým 3', libuse: 'Tým 4', bruncvik: 'Tým 5', karel: 'Tým 6' };
-const Q = new URLSearchParams(location.search), DEP = Q.get('u'), KEY = Q.get('k');
+const Q = new URLSearchParams(location.search), DEP = Q.get('u') || window.ORG?.dep, KEY = Q.get('k') || window.ORG?.key;
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const msgs = new Map();
@@ -87,7 +88,7 @@ async function poll() {
   render();
 }
 
-if (!DEP || !KEY) { $('status').textContent = 'Chybí údaje v odkazu (?u=…&k=…).'; $('status').className = 'err'; }
+if (!DEP || !KEY) { $('status').textContent = 'Chybí nastavení sledování (org-config.js).'; $('status').className = 'err'; }
 else { poll(); setInterval(poll, 20000); setInterval(render, 30000); $('tests').onchange = render; }
 </script>
 </body>
