@@ -300,16 +300,13 @@ async function updateHintCount() {
   try { const n = await hintCount(); $('hintcount').textContent = n ? `Nápovědy: ${n}` : ''; } finally { hcBusy = false; }
 }
 
-// ---------- sledování postupu pro orgy (ntfy.sh, tajný kanál z meta.track) ----------
+// ---------- sledování postupu pro orgy (Google tabulka přes Apps Script, URL v meta.track) ----------
 // Zprávy čekají ve frontě v prohlížeči a odešlou se, až bude signál. Hra na odeslání nikdy nečeká.
 const TQ = () => 'pasifra:track:' + id;
 function track(task, title, hints) {
   if (!meta.track) return;
   let q = []; try { q = JSON.parse(store.get(TQ())) || []; } catch {}
-  const test = params.get('now') ? ['test'] : [];
-  q.push({ title: `${meta.name}: ${task >= meta.tasks ? 'CÍL – vyřešen poslední úkol' : `vyřešen úkol ${task}`}`,
-    message: `${meta.name} vyřešil ${task}. ${title} (nápověd celkem ${hints})`,
-    tags: [`tym-${meta.team}`, `ukol-${task}`, `napovedy-${hints}`, `cas-${now()}`, ...test] });
+  q.push({ id: `${meta.team}-${task}-${now()}`, team: meta.team, name: meta.name, task, title, hints, at: now(), test: !!params.get('now') });
   store.set(TQ(), JSON.stringify(q));
   flushTrack();
 }
@@ -321,8 +318,8 @@ async function flushTrack() {
   flushing = true;
   try {
     while (q.length) {
-      const r = await fetch('https://ntfy.sh/', { method: 'POST', body: JSON.stringify({ topic: meta.track, ...q[0] }) });
-      if (!r.ok) break;
+      // text/plain + no-cors: Apps Script nepotřebuje CORS preflight; chyba sítě vyhodí výjimku
+      await fetch(meta.track, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(q[0]) });
       q.shift(); store.set(TQ(), JSON.stringify(q));
     }
   } catch { /* bez signálu – zkusí se později */ } finally { flushing = false; }

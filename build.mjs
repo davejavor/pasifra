@@ -215,7 +215,7 @@ async function loadAll() {
   }
   for (const t of teams) {
     t.contacts = contacts;
-    t.track = common.track_topic || null;
+    t.track = common.track_url || null;
     t.tasks.forEach((k) => {
       const n = normalize(k.answer);
       const bits = Math.log2(/^\d+$/.test(n) ? 10 : 36) * n.length;
