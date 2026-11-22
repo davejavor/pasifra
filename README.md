@@ -71,6 +71,7 @@ Pak jde zálohovat a verzovat zvlášť a do veřejného repa se nikdy nedostane
 - `finale` je závěrečná obrazovka (`title`, `body_md`, volitelně `image`), odemkne se kódem posledního úkolu.
 - Každý úkol má 2 nápovědy s `after_min` vzestupně, nebo žádnou (`"hints": []`, pak se blok nápověd nezobrazí).
 - **Volnější odpověď:** místo `answer` jde napsat `"answer_contains": ["karel", "karl"]` (1–4 klíčová slova, aspoň 3 znaky). Odpověď pak projde, když klíčové slovo kdekoli obsahuje („socha Karla IV.“). Pište kmeny slov kvůli skloňování. V datech jsou jen zašifrované obálky, nic čitelného.
+- **Varianty přesné odpovědi:** `"answer_one_of": ["16", "15", "17", "16schodu"]` (1–8 variant, i krátká čísla). Projde jen celá odpověď rovná některé variantě (po normalizaci), ne text, který ji obsahuje. Hodí se na počítání a čísla, kde `answer_contains` nejde (min. 3 znaky) nebo by bylo moc volné.
 - `code_label` (volitelné) je popisek nad polem pro odpověď, výchozí je „Odpověď“.
 
 ### Osmisměrka jako úkol

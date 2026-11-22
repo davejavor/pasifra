@@ -114,6 +114,11 @@ async function loadTeam(file, errors, warnings) {
       if (t.answer && normalize(t.answer) !== normalize(t.wordsearch.solution || '')) err(`${where}: "answer" neodpovídá tajence osmisměrky`);
       t.answer = t.answer || t.wordsearch.solution;
     }
+    if (t.answer_one_of) {
+      if (t.answer_contains) err(`${where}: "answer_one_of" a "answer_contains" nejdou zároveň`);
+      else if (!Array.isArray(t.answer_one_of) || !t.answer_one_of.length || t.answer_one_of.length > 8 || t.answer_one_of.some((k) => normalize(k).length < 1)) err(`${where}: "answer_one_of" má být 1–8 variant odpovědi`);
+      else t.answer = t.answer || t.answer_one_of[0];
+    }
     if (t.answer_contains) {
       if (!Array.isArray(t.answer_contains) || !t.answer_contains.length || t.answer_contains.length > 4 || t.answer_contains.some((k) => normalize(k).length < 3)) err(`${where}: "answer_contains" má být 1–4 klíčová slova o délce aspoň 3 znaky`);
       else t.answer = t.answer || t.answer_contains[0];
@@ -135,7 +140,8 @@ async function loadTeam(file, errors, warnings) {
         id: i + 1,
         shared: t.shared,
         answer: t.answer || '',
-        contains: t.answer_contains || null,
+        contains: t.answer_contains || t.answer_one_of || null,
+        exact: !!t.answer_one_of,
         ws: wsContent ? { spec: t.wordsearch, analysis: analyze(t.wordsearch, POOL.groups) } : null,
         content: {
           id: i + 1,
@@ -234,7 +240,7 @@ async function encryptTeam(team) {
   for (const t of team.tasks) {
     const slot = t.id === team.tasks.length ? 'finale' : t.id + 1;
     const content = t.contains
-      ? { ...t.content, accept: await makeAccept(keys.tasks[t.id - 1], t.contains, t.answer, team.salt, slot, ITER) }
+      ? { ...t.content, accept: await makeAccept(keys.tasks[t.id - 1], t.contains, t.answer, team.salt, slot, ITER, t.exact) }
       : t.content;
     out.tasks.push(await encrypt(keys.tasks[t.id - 1], content));
   }
@@ -315,6 +321,11 @@ async function verify() {
         if (!accept) e(`úkol ${k.id}: chybí obálky pro "answer_contains"`);
         else {
           for (const kw of k.contains) {
+            if (k.exact) {
+              if (!(await unlockNext(key, ` ${kw}. `, accept, t.salt, slot, next, ITER))) e(`úkol ${k.id}: varianta „${kw}“ neodemyká`);
+              if (await unlockNext(key, `x${kw}x`, accept, t.salt, slot, next, ITER)) e(`úkol ${k.id}: varianta „${kw}“ projde i uvnitř jiného textu`);
+              continue;
+            }
             const r = await unlockNext(key, `Socha ${kw}ova, prosím!`, accept, t.salt, slot, next, ITER);
             if (!r) e(`úkol ${k.id}: klíčové slovo „${kw}“ uprostřed textu neodemyká`);
           }
@@ -376,7 +387,7 @@ async function cheatsheet() {
   ${t.tasks.map((k) => `
   <article>
     <h3>${k.id}. ${esc(k.content.title)}${k.shared ? ` <em>(společné: ${esc(k.shared)})</em>` : ''}</h3>
-    <p><b>Kód:</b> ${k.contains ? 'stačí, když odpověď obsahuje: ' + esc(k.contains.map(normalize).join(' / ')) : esc(k.answer) + ' <code>' + esc(normalize(k.answer)) + '</code>'}</p>
+    <p><b>Kód:</b> ${k.contains ? (k.exact ? 'platí kterákoli varianta: ' : 'stačí, když odpověď obsahuje: ') + esc(k.contains.map(normalize).join(' / ')) : esc(k.answer) + ' <code>' + esc(normalize(k.answer)) + '</code>'}</p>
     <p><b>Zadání:</b> ${nl(k.content.body_md)}</p>
     <ul>${k.content.hints.map((h) => `<li>po ${h.after_min} min: ${nl(h.text)}</li>`).join('')}</ul>
     ${k.ws ? `<p><b>Osmisměrka:</b> tajenka <code>${esc(k.ws.analysis.leftover)}</code>, podkres <code>${esc(k.ws.analysis.underlay)}</code>, slova: ${esc(k.ws.spec.words.join(', '))}</p>` : ''}

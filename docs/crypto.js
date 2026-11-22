@@ -96,7 +96,8 @@ export async function unlockNext(prevKey, raw, accept, salt, slot, nextBlob, ite
   }
   const n = normalize(raw).slice(0, 80);
   const seen = new Set();
-  for (const len of accept.lens) {
+  // exact: přijímá se jen celá odpověď (varianty answer_one_of), ne úseky
+  for (const len of accept.exact ? [n.length] : accept.lens) {
     for (let i = 0; i + len <= n.length; i++) {
       const sub = n.slice(i, i + len);
       if (seen.has(sub)) continue;
@@ -114,9 +115,11 @@ export async function unlockNext(prevKey, raw, accept, salt, slot, nextBlob, ite
   return null;
 }
 
-export async function makeAccept(prevKey, keywords, canonical, salt, slot, iter = DEFAULT_ITER) {
+export async function makeAccept(prevKey, keywords, canonical, salt, slot, iter = DEFAULT_ITER, exact = false) {
   const kws = [...new Set(keywords.map(normalize))];
   const wraps = [];
   for (const kw of kws) wraps.push(await encrypt(await deriveNext(prevKey, kw, salt, `${slot}:alt`, iter), { a: normalize(canonical) }));
-  return { lens: [...new Set(kws.map((k) => k.length))].sort((a, b) => b - a), wraps };
+  const out = { lens: [...new Set(kws.map((k) => k.length))].sort((a, b) => b - a), wraps };
+  if (exact) out.exact = true;
+  return out;
 }
