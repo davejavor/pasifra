@@ -183,7 +183,7 @@ async function loadAll() {
   const contacts = common.contacts || [];
   if (contacts.length < 1) errors.push('common.json: chybí "contacts"');
   for (const c of contacts) {
-    if (!c.name || !/^\d{9,15}$/.test(c.phone || '')) errors.push(`common.json: kontakt ${JSON.stringify(c)} – telefon jen číslice včetně předvolby, např. 420777123456`);
+    if (!c.name || (c.phone && !/^\d{9,15}$/.test(c.phone))) errors.push(`common.json: kontakt ${JSON.stringify(c)} – telefon jen číslice včetně předvolby, např. 420777123456`);
   }
 
   try { await loadPool(warnings); } catch (e) { errors.push(e.message); }

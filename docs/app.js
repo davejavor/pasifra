@@ -226,8 +226,11 @@ async function renderItems() {
 
 function renderContact() {
   main.innerHTML = `<div class="card"><h2>Zasekli jste se?</h2>
-    <p>To se stane i nejlepším. Napište nám na WhatsApp a rádi poradíme.</p>
-    ${meta.contacts.map((c) => `<a class="btn" href="https://wa.me/${esc(c.phone)}" target="_blank" rel="noopener">${esc(c.name)}</a>`).join('')}</div>`;
+    <p>To se stane i nejlepším. Napište (případně zavolejte) ${meta.contacts.map((c) => esc(c.dativ || c.name)).join(' nebo ')}, čísla máte v telefonu. Rádi poradíme.</p>
+    ${meta.contacts.filter((c) => c.phone).map((c) => `<p><b>${esc(c.name)}</b>: ${esc(c.phone.replace(/^420/, '').replace(/(\d{3})(?=\d)/g, '$1 '))}</p>
+    <a class="btn" href="https://wa.me/${esc(c.phone)}" target="_blank" rel="noopener">Napsat na WhatsApp</a>
+    <a class="btn" href="sms:+${esc(c.phone)}">Poslat SMS</a>
+    <a class="btn" href="tel:+${esc(c.phone)}">Zavolat</a>`).join('')}</div>`;
 }
 
 // ---------- odpověď ----------
