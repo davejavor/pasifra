@@ -1,6 +1,6 @@
 // Minimální service worker: network-first pro vše ze stejného originu, cache jen jako záloha při výpadku.
-// 20261122204825 doplní build.mjs (docs/sw.js), takže se název cache změní s každým buildem a stará cache se smaže.
-const CACHE = 'pasifra-20261122204825';
+// 20261122205155 doplní build.mjs (docs/sw.js), takže se název cache změní s každým buildem a stará cache se smaže.
+const CACHE = 'pasifra-20261122205155';
 const TIMEOUT_MS = 4000;
 
 self.addEventListener('install', () => self.skipWaiting());

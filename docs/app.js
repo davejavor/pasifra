@@ -227,12 +227,14 @@ async function renderItems() {
   for (const { it, i } of list) {
     const key = `pasifra:solve:${id}:${i}`;
     const done = it.solve && store.get(key) === '1';
-    html += `<div class="card"><h3>${esc(it.label)}</h3>${img(it.image)}${it.image ? '' : md(it.text)}
-      ${it.solve ? (done
-        ? `<p class="ok">✓ ${esc(it.solve.answer)}</p>`
-        : `<form class="solve" data-i="${i}" autocomplete="off"><label class="dim" for="s${i}">${esc(it.solve.label)}</label>
-           <input id="s${i}" type="text" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
-           <div class="msg" role="status"></div><button type="submit">Ověřit</button></form>`) : ''}</div>`;
+    const body = it.solve
+      ? (done
+        ? (it.solve.image ? img(it.solve.image) : `<p class="ok">✓ ${esc(it.solve.answer)}</p>`)
+        : `${md(it.text)}<form class="solve" data-i="${i}" autocomplete="off">
+           <input type="text" aria-label="Řešení útržku" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
+           <div class="msg" role="status"></div><button type="submit">Ověřit</button></form>`)
+      : (it.image ? img(it.image) : md(it.text));
+    html += `<div class="card utrzek"><h3>${esc(it.label)}</h3>${body}</div>`;
   }
   main.innerHTML = html;
   main.querySelectorAll('form.solve').forEach((f) => f.addEventListener('submit', async (e) => {

@@ -157,7 +157,7 @@ async function loadTeam(file, errors, warnings) {
           item: t.item ? {
             label: t.item.label, text: t.item.text, image: await imageToDataUrl(t.item.image),
             ...(t.item.show === false ? { show: false } : {}),
-            ...(t.item.solve ? { solve: { label: t.item.solve.label, answer: t.item.solve.answer } } : {}),
+            ...(t.item.solve ? { solve: { answer: t.item.solve.answer, image: await imageToDataUrl(t.item.solve.image) } } : {}),
           } : null,
           ...(wsContent ? { wordsearch: wsContent } : {}),
         },
