@@ -215,6 +215,7 @@ async function loadAll() {
   }
   for (const t of teams) {
     t.contacts = contacts;
+    t.track = common.track_topic || null;
     t.tasks.forEach((k) => {
       const n = normalize(k.answer);
       const bits = Math.log2(/^\d+$/.test(n) ? 10 : 36) * n.length;
@@ -239,7 +240,7 @@ async function chainKeys(team) {
 }
 
 function metaOf(team) {
-  return { team: team.team, name: team.name, contacts: team.contacts, tasks: team.tasks.length };
+  return { team: team.team, name: team.name, contacts: team.contacts, track: team.track, tasks: team.tasks.length };
 }
 
 async function encryptTeam(team) {

@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Šifrovačka – přehled pro orgy</title>
+<style>
+  :root{--bg:#14110d;--card:#211a12;--line:#4a3d2b;--text:#f0e6d2;--dim:#a8997e;--accent:#e3c98f;--ok:#7fd18b;--warn:#f0a35e}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 system-ui,sans-serif}
+  header{padding:.8rem 1rem;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:.5rem}
+  h1{margin:0;font-size:1.15rem;color:var(--accent)}
+  main{max-width:46rem;margin:0 auto;padding:1rem}
+  .team{background:var(--card);border:1px solid var(--line);border-radius:.7rem;padding:.8rem 1rem;margin:.6rem 0}
+  .row{display:flex;justify-content:space-between;align-items:baseline;gap:.5rem}
+  .name{font-weight:700;font-size:1.1rem}
+  .bar{display:flex;gap:4px;margin:.5rem 0}
+  .bar span{flex:1;height:10px;border-radius:3px;background:#3a3024}
+  .bar span.done{background:var(--accent)}
+  .bar span.now{background:var(--warn)}
+  .dim{color:var(--dim);font-size:.9rem}
+  .fin{color:var(--ok);font-weight:700}
+  .late{color:var(--warn);font-weight:700}
+  #log{font-size:.85rem;color:var(--dim)}
+  #log div{border-top:1px solid #2b2318;padding:.3rem 0}
+  label{font-size:.85rem;color:var(--dim)}
+  .err{color:var(--warn)}
+</style>
+</head>
+<body>
+<header><h1>Šifrovačka – postup týmů</h1><label><input type="checkbox" id="tests"> testy</label></header>
+<main>
+  <p class="dim" id="status">Načítám…</p>
+  <div id="teams"></div>
+  <h2 style="font-size:1rem;color:var(--accent)">Poslední zprávy</h2>
+  <div id="log"></div>
+</main>
+<script>
+// Čte tajný kanál ntfy.sh (?k=<kanál>). Týmy posílají zprávu při každém vyřešeném úkolu.
+const TASKS = 6, TEAMS = ['hus', 'vaclav', 'zizka', 'libuse', 'bruncvik', 'karel'];
+const NAMES = { hus: 'Tým 1', vaclav: 'Tým 2', zizka: 'Tým 3', libuse: 'Tým 4', bruncvik: 'Tým 5', karel: 'Tým 6' };
+const topic = new URLSearchParams(location.search).get('k');
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const msgs = new Map();
+
+function parse(m) {
+  const tag = (p) => (m.tags || []).find((t) => t.startsWith(p))?.slice(p.length);
+  return { id: m.id, team: tag('tym-'), task: Number(tag('ukol-')), hints: Number(tag('napovedy-')), at: Number(tag('cas-')) || m.time * 1000, test: (m.tags || []).includes('test'), text: m.message };
+}
+const ago = (ms) => { const m = Math.max(0, Math.round((Date.now() - ms) / 60000)); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`; };
+const hhmm = (ms) => new Date(ms).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
+
+function render() {
+  const showTests = $('tests').checked;
+  const list = [...msgs.values()].filter((m) => m.team && (showTests || !m.test)).sort((a, b) => a.at - b.at);
+  const state = {};
+  for (const m of list) {
+    const s = state[m.team] ||= { solved: 0, hints: 0, at: null };
+    if (m.task >= s.solved) { s.solved = m.task; s.hints = m.hints; s.at = m.at; }
+  }
+  $('teams').innerHTML = TEAMS.map((t) => {
+    const s = state[t] || { solved: 0, hints: 0, at: null };
+    const fin = s.solved >= TASKS;
+    const bar = Array.from({ length: TASKS }, (_, i) => `<span class="${i < s.solved ? 'done' : i === s.solved ? 'now' : ''}"></span>`).join('');
+    const since = s.at ? ago(s.at) : null;
+    const late = !fin && s.at && Date.now() - s.at > 30 * 60000;
+    return `<div class="team"><div class="row"><span class="name">${NAMES[t]}</span>
+      <span>${fin ? '<span class="fin">v cíli</span>' : `úkol ${s.solved + 1}/${TASKS}`}</span></div>
+      <div class="bar">${bar}</div>
+      <div class="row dim"><span>${s.at ? `${fin ? 'dorazil' : 'poslední vyřešený'} v ${hhmm(s.at)}${fin ? '' : `, na úkolu <span class="${late ? 'late' : ''}">${since}</span>`}` : 'zatím bez zprávy'}</span>
+      <span>nápovědy: ${s.hints}</span></div></div>`;
+  }).join('');
+  $('log').innerHTML = list.slice(-15).reverse().map((m) => `<div>${hhmm(m.at)} · ${esc(m.text)}${m.test ? ' (test)' : ''}</div>`).join('') || '<div>Zatím nic.</div>';
+}
+
+async function poll() {
+  try {
+    const r = await fetch(`https://ntfy.sh/${encodeURIComponent(topic)}/json?poll=1&since=all`);
+    const text = await r.text();
+    for (const line of text.split('\n')) {
+      if (!line.trim()) continue;
+      const m = JSON.parse(line);
+      if (m.event === 'message') msgs.set(m.id, parse(m));
+    }
+    $('status').textContent = `Aktualizováno ${hhmm(Date.now())}. Obnovuje se samo každých 20 s.`;
+    $('status').className = 'dim';
+  } catch (e) {
+    $('status').textContent = 'Nepodařilo se načíst zprávy (signál?). Zkusím to znovu.';
+    $('status').className = 'err';
+  }
+  render();
+}
+
+if (!topic) { $('status').textContent = 'Chybí klíč v odkazu (?k=…).'; $('status').className = 'err'; }
+else { poll(); setInterval(poll, 20000); setInterval(render, 30000); $('tests').onchange = render; }
+</script>
+</body>
+</html>

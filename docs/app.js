@@ -40,7 +40,7 @@ let id, data, meta, K, S, view = 'task', taskCtx = null;
 const cache = new Map();
 
 // S = { keys: {meta, tasks:[b64], finale:b64|null}, at:[ms odemčení] }
-const saveState = () => store.set('pasifra:state:' + id, JSON.stringify({ keys: S.keys, at: S.at }));
+const saveState = () => store.set('pasifra:state:' + id, JSON.stringify({ keys: S.keys, at: S.at, fin: S.fin || null }));
 const unlocked = () => K.tasks.length;
 const finished = () => !!K.finale;
 const solvedCount = () => (finished() ? meta.tasks : unlocked() - 1);
@@ -143,7 +143,10 @@ async function render() {
 async function renderTask() {
   if (finished()) {
     const f = await decrypt(K.finale, data.finale);
-    main.innerHTML = `<div class="card finale"><h2>${esc(f.title)}</h2>${img(f.image)}${md(f.body_md)}</div>`;
+    if (!S.fin) { S.fin = now(); saveState(); }
+    const mins = Math.round((S.fin - S.at[0]) / 60000), hc = await hintCount();
+    main.innerHTML = `<div class="card finale"><h2>${esc(f.title)}</h2>${img(f.image)}${md(f.body_md)}
+      <p class="dim">Zvládli jste to za ${Math.floor(mins / 60)} h ${String(mins % 60).padStart(2, '0')} min s ${hc} ${hc === 1 ? 'nápovědou' : 'nápovědami'}.</p></div>`;
     return;
   }
   const i = unlocked() - 1;
@@ -170,7 +173,7 @@ async function renderTask() {
       <div class="msg" id="msg" role="status"></div>
       <button type="submit" id="go">Odemknout další úkol</button>
     </form>
-    ${c.hints.length ? '<div class="card"><p class="dim" id="nexthint"></p><div id="hints"></div></div>' : ''}
+    ${c.hints.length ? '<div class="card"><div id="hints"></div></div>' : ''}
     <button class="stuck" id="stuck">Zasekli jsme se</button>`;
   $('stuck').onclick = () => { view = 'contact'; render(); };
   $('f').onsubmit = onSubmit;
@@ -192,11 +195,14 @@ function renderHints() {
   if (!taskCtx || !$('hints')) return;
   const { c, i } = taskCtx;
   const names = ['Malá nápověda', 'Velká nápověda'];
+  // Bez odpočtu: kdo neví, kdy nápověda přijde, spíš luští dál. Odemčená se zobrazí sama.
+  let lockedShown = false;
   $('hints').innerHTML = c.hints.map((h, j) => {
     const when = S.at[i] + h.after_min * 60000;
-    return now() >= when
-      ? `<div class="hint"><b>${names[j] || 'Nápověda'}</b>${md(h.text)}</div>`
-      : `<div class="hint locked" data-until="${when}">${names[j] || 'Nápověda'} za <span class="timer"></span></div>`;
+    if (now() >= when) return `<div class="hint"><b>${names[j] || 'Nápověda'}</b>${md(h.text)}</div>`;
+    if (lockedShown) return `<span hidden data-until="${when}"></span>`;
+    lockedShown = true;
+    return `<div class="hint locked" data-until="${when}">Další nápověda zatím není k dispozici.</div>`;
   }).join('');
 }
 
@@ -269,15 +275,63 @@ async function onSubmit(e) {
   go.disabled = false;
   if (!res) { msg.textContent = WRONG[wrongCount++ % WRONG.length]; $('code').select(); return; }
   const exp = await exportKey(key);
-  if (last) { K.finale = key; S.keys.finale = exp; } else { K.tasks.push(key); S.keys.tasks.push(exp); S.at.push(now()); }
+  if (last) { K.finale = key; S.keys.finale = exp; S.fin = now(); } else { K.tasks.push(key); S.keys.tasks.push(exp); S.at.push(now()); }
   saveState();
   onSolved(cur);
   $('flash').hidden = false;
   setTimeout(() => { $('flash').hidden = true; view = 'task'; render(); }, 1000);
 }
 
-// Místo pro mapu postupu týmů (Leaflet + Supabase) – mimo MVP.
-function onSolved(/* taskNo */) {}
+// ---------- počítadlo nápověd ----------
+// Odemčené nápovědy všech úkolů (u vyřešených do okamžiku vyřešení).
+async function hintCount() {
+  let n = 0;
+  for (let i = 0; i < unlocked(); i++) {
+    const c = await content(i);
+    if (!c || S.at[i] == null) continue;
+    const end = i + 1 < unlocked() ? S.at[i + 1] : (finished() ? S.fin || now() : now());
+    n += c.hints.filter((h) => S.at[i] + h.after_min * 60000 <= end).length;
+  }
+  return n;
+}
+let hcBusy = false;
+async function updateHintCount() {
+  if (hcBusy || !K) return; hcBusy = true;
+  try { const n = await hintCount(); $('hintcount').textContent = n ? `Nápovědy: ${n}` : ''; } finally { hcBusy = false; }
+}
+
+// ---------- sledování postupu pro orgy (ntfy.sh, tajný kanál z meta.track) ----------
+// Zprávy čekají ve frontě v prohlížeči a odešlou se, až bude signál. Hra na odeslání nikdy nečeká.
+const TQ = () => 'pasifra:track:' + id;
+function track(task, title, hints) {
+  if (!meta.track) return;
+  let q = []; try { q = JSON.parse(store.get(TQ())) || []; } catch {}
+  const test = params.get('now') ? ['test'] : [];
+  q.push({ title: `${meta.name}: ${task >= meta.tasks ? 'CÍL – vyřešen poslední úkol' : `vyřešen úkol ${task}`}`,
+    message: `${meta.name} vyřešil ${task}. ${title} (nápověd celkem ${hints})`,
+    tags: [`tym-${meta.team}`, `ukol-${task}`, `napovedy-${hints}`, `cas-${now()}`, ...test] });
+  store.set(TQ(), JSON.stringify(q));
+  flushTrack();
+}
+let flushing = false;
+async function flushTrack() {
+  if (flushing || !meta?.track) return;
+  let q = []; try { q = JSON.parse(store.get(TQ())) || []; } catch {}
+  if (!q.length) return;
+  flushing = true;
+  try {
+    while (q.length) {
+      const r = await fetch('https://ntfy.sh/', { method: 'POST', body: JSON.stringify({ topic: meta.track, ...q[0] }) });
+      if (!r.ok) break;
+      q.shift(); store.set(TQ(), JSON.stringify(q));
+    }
+  } catch { /* bez signálu – zkusí se později */ } finally { flushing = false; }
+}
+async function onSolved(taskNo) {
+  const c = await content(taskNo - 1);
+  track(taskNo, c?.title || '', await hintCount());
+}
+addEventListener('online', () => flushTrack());
 
 // ---------- časovače a globální zprávy ----------
 function tick() {
@@ -289,12 +343,12 @@ function tick() {
   document.querySelectorAll('[data-until]').forEach((el) => {
     const left = Number(el.dataset.until) - t;
     if (left <= 0) { expired = true; return; }
-    el.querySelector('.timer').textContent = mmss(left);
+    const tm = el.querySelector('.timer'); if (tm) tm.textContent = mmss(left);
     if (next == null) next = left;
   });
   if (expired && view === 'task' && taskCtx) { renderHints(); return tick(); }
-  const nh = $('nexthint');
-  if (nh) nh.innerHTML = next == null ? 'Všechny nápovědy jsou odemčené.' : `Další nápověda za <span class="timer">${mmss(next)}</span>`;
+  updateHintCount();
+  if (Math.floor(t / 1000) % 20 === 0) flushTrack();
   $('banners').innerHTML = CONFIG.MESSAGES.filter((m) => t >= Date.parse(m.at)).reverse()
     .map((m) => `<div class="banner">${md(utf8(m.text))}</div>`).join('');
 }
